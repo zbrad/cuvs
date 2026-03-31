@@ -92,3 +92,5 @@ ivf_pq_index
 # cuda build logs
 build_*.log
 
+# tarballs
+libcuvs*.tar.gz
