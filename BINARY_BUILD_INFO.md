@@ -3,17 +3,26 @@
 
 ## Build Summary
 
-**Binary Release Name:** cuVS CUDA 13.2 - Ada to Blackwell Support
-**Build Date:** 2026-03-31
-**CUDA Version:** 13.2.51
+**Binary Release Name:** cuVS CUDA 13.2 - Ada to Blackwell Support  
+**Build Date:** 2026-03-31  
+**CUDA Version:** 13.2.51  
 **Supported GPU Range:** RTX 4080 (minimum) → RTX 5090 (current) → DGX Spark (included)
 
 ### Library Binaries
 
-| Library | Platform | Target | SM |
-|---------|----------|--------|----|
-| `libcuvs.so` | x86_64 | Ada, Hopper, Blackwell discrete GPUs | 89, 90a, 100f, 101, 120, 121 |
-| `libcuvs-spark.so` | aarch64 | DGX Spark — GB10 Grace Blackwell only | 103 |
+Library names follow the convention documented in
+`gpu-build/docs/WHEEL_NAMING.md` (mirrors `zbrad/faiss gpu-cu/docs/WHEEL_NAMING.md`):
+
+| Library | Platform | Target | SM | Build script |
+|---------|----------|--------|----|--------------|
+| `libcuvs-x86_64-cu132.so` | x86_64 | Ada, Hopper, Blackwell discrete GPUs | 89, 90a, 100f, 101, 103, 120, 121 | `build_x86_64.sh` |
+| `libcuvs-aarch64-cu132-sm103.so` | aarch64 | DGX Spark — GB10 Grace Blackwell only | 103 | `build_aarch64.sh` |
+
+**Naming rules:**
+- CPU arch (`x86_64` / `aarch64`) is in the library filename, not derived from the build host alone.
+- CUDA version (`cu132`) is derived from the single knob in `scripts/cuda_env.sh`.
+- `-sm<arch>` suffix is appended **only** for single-arch builds; multi-arch builds omit it.
+- The build directory (`cpp/build/`) is version-agnostic; no CUDA version in the path.
 
 ### Quick Reference: Consumer GPUs
 
@@ -155,9 +164,16 @@ All architectures compiled with `-real` suffix:
 
 ## DGX Spark Build Notes
 
-The DGX Spark uses the **GB10 Grace Blackwell Superchip** (SM 103), distributed as a **separate library: `libcuvs-spark.so`**.
+The DGX Spark uses the **GB10 Grace Blackwell Superchip** (SM 103), distributed
+as a **separate aarch64 library: `libcuvs-aarch64-cu132-sm103.so`**.
 
-Built with: `./build_dgx_spark.sh` → `--cmake-args="-DCUVS_OUTPUT_NAME=cuvs-spark"` → `libcuvs-spark.so`
+Built with:
+```
+bash build_aarch64.sh
+  # CUDA_VER=13.2, CUDA_ARCHS="103-real" (single-arch → -sm103 suffix)
+  # -DCUVS_OUTPUT_NAME=cuvs-aarch64-cu132-sm103
+  # Output: cpp/build/libcuvs-aarch64-cu132-sm103.so
+```
 
 Key DGX Spark characteristics:
 - **arm64 (aarch64)** system — this binary is built for `sbsa-linux` architecture
@@ -165,4 +181,13 @@ Key DGX Spark characteristics:
 - 128GB unified LPDDR5X memory shared between Grace CPU and GPU
 - NVLink-C2C interconnect between CPU and GPU
 
-This build was compiled on an **aarch64** host (confirmed: `nvcc 13.2.51` on `sbsa-linux`), making it fully native for DGX Spark deployment without cross-compilation.
+This build was compiled on an **aarch64** host (confirmed: `nvcc 13.2.51` on
+`sbsa-linux`), making it fully native for DGX Spark deployment without
+cross-compilation.
+
+### Deprecated script names
+
+| Old script | New script | Note |
+|------------|------------|------|
+| `build_dgx_spark.sh` | `build_aarch64.sh` | Shim retained for backward compat |
+| `build_ada_blackwell.sh` | `build_x86_64.sh` | Shim retained for backward compat |
