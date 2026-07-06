@@ -1506,6 +1506,11 @@ if(NOT BUILD_CPU_ONLY)
   if(NOT cuvs_compile_mode STREQUAL "static_only")
     add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
     add_library(cuvs::cuvs ALIAS cuvs)
+    # Allow overriding the output library name, e.g. for platform-specific builds
+    # such as DGX Spark: -DCUVS_OUTPUT_NAME=cuvs-gb10-cu132 -> libcuvs-gb10-cu132.so
+    if(DEFINED CUVS_OUTPUT_NAME)
+      set_target_properties(cuvs PROPERTIES OUTPUT_NAME "${CUVS_OUTPUT_NAME}")
+    endif()
     set_target_properties(
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"

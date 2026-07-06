@@ -88,3 +88,9 @@ ivf_pq_index
 
 # java
 .classpath
+
+# cuda build logs
+build_*.log
+
+# tarballs
+libcuvs*.tar.gz
