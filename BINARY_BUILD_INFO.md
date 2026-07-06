@@ -1,68 +1,45 @@
 # cuVS Binary Build Information
-# CUDA 13.2 - RTX 4080 through RTX 5090 & DGX Spark
+# CUDA 13.2 - RTX 40, RTX 50 & DGX Spark (GB10)
 
 ## Build Summary
 
-**Binary Release Name:** cuVS CUDA 13.2 - Ada to Blackwell Support  
-**Build Date:** 2026-03-31  
-**CUDA Version:** 13.2.51  
-**Supported GPU Range:** RTX 4080 (minimum) → RTX 5090 (current) → DGX Spark (included)
+**Binary Release Name:** cuVS CUDA 13.2 - RTX40/RTX50/GB10
+**Build Date:** 2026-03-31
+**CUDA Version:** 13.2.51
+**Supported GPU Range:** RTX 4080/4090 (RTX 40), RTX 5080/5090 (RTX 50), DGX Spark (GB10)
+
+Builds are single-arch and named by GPU codename (not CPU arch or SM number),
+mirroring zbrad/vllm's `gb10` branch convention. Datacenter/professional
+architectures (Hopper, Blackwell DC, GB200, and Ada professional parts like
+L40/L40S/RTX 6000 Ada) are intentionally **not** built here — this repo only
+targets owned/verified consumer + DGX Spark hardware. See
+`gpu-build/docs/WHEEL_NAMING.md` for the full rationale and naming rules.
 
 ### Library Binaries
 
-Library names follow the convention documented in
-`gpu-build/docs/WHEEL_NAMING.md` (mirrors `zbrad/faiss gpu-cu/docs/WHEEL_NAMING.md`):
-
 | Library | Platform | Target | SM | Build script |
 |---------|----------|--------|----|--------------|
-| `libcuvs-x86_64-cu132.so` | x86_64 | Ada, Hopper, Blackwell discrete GPUs | 89, 90a, 100f, 101, 103, 120, 121 | `build_x86_64.sh` |
-| `libcuvs-aarch64-cu132-sm103.so` | aarch64 | DGX Spark — GB10 Grace Blackwell only | 103 | `build_aarch64.sh` |
+| `libcuvs-rtx40-cu132.so` | x86_64 | RTX 4080, RTX 4090 (Ada Lovelace) | 89 | `build_rtx40.sh` |
+| `libcuvs-rtx50-cu132.so` | x86_64 | RTX 5080, RTX 5090 (Blackwell) | 120 | `build_rtx50.sh` |
+| `libcuvs-gb10-cu132.so` | aarch64 | DGX Spark — GB10 Grace Blackwell | 121 | `build_gb10.sh` |
 
 **Naming rules:**
-- CPU arch (`x86_64` / `aarch64`) is in the library filename, not derived from the build host alone.
+- GPU codename (`gb10` / `rtx40` / `rtx50`) is in the library filename; CPU
+  arch and SM number are not, since each codename implies exactly one of each.
 - CUDA version (`cu132`) is derived from the single knob in `scripts/cuda_env.sh`.
-- `-sm<arch>` suffix is appended **only** for single-arch builds; multi-arch builds omit it.
+- Every build here is single-arch, compiled `-real` (native SASS, no PTX/JIT
+  fallback).
 - The build directory (`cpp/build/`) is version-agnostic; no CUDA version in the path.
 
-### Quick Reference: Consumer GPUs
+### Consumer GPU Support
 
-| GPU | Supported | Architecture | SM |
-|-----|-----------|---|---|
-| RTX 4080 | ✓ SUPPORTED | Ada Lovelace | 89 |
-| RTX 4090 | ✓ SUPPORTED | Ada Lovelace | 89 |
-| RTX 5080 | ✓ SUPPORTED ⭐ | Blackwell GB20x | 120 |
-| RTX 5090 | ✓ SUPPORTED ⭐⭐ | Blackwell GB20x | 120 |
-
-### Consumer GPU Support (Entry to Flagship)
-
-| GPU | Architecture | SM | Tier | Notes |
-|-----|---|---|---|---|
-| **RTX 4080** | Ada Lovelace | 89 | ENTRY | Consumer entry point |
-| **RTX 4090** | Ada Lovelace | 89 | HIGH-END | Desktop enthusiast GPU |
-| **RTX 5080** ⭐ | Blackwell GB20x | 120 | MID-RANGE | Next-gen consumer (GB203 die) |
-| **RTX 5090** ⭐⭐ | Blackwell GB20x | 120 | FLAGSHIP | Next-gen consumer flagship (GB202 die) |
-
-### Professional & Datacenter GPUs
-
-| GPU | Architecture | SM | Type |
-|-----|---|---|---|
-| **L40** | Ada Lovelace | 89 | Professional GPU |
-| **L40S** | Ada Lovelace | 89 | Enhanced Professional GPU |
-| **RTX 6000 Ada** | Ada Lovelace | 89 | Professional Workstation |
-| **H100 PCIe / SXM** | Hopper | 90a | Datacenter GPU |
-| **H200** | Hopper | 90a | High-Memory Datacenter GPU |
-| **B100** | Blackwell | 100f | Datacenter Blackwell |
-| **B200** | Blackwell | 100f | Datacenter Blackwell Flagship |
-| **B10x mid-tier** | Blackwell | 101 | Datacenter Blackwell Mid |
-| **DGX Spark (GB10)** ⭐ | Blackwell Grace | 103 | Grace Blackwell Superchip |
-| **GB200 NVL72** | Blackwell NVLink | 120a | Next-Gen NVLink Datacenter |
-| **GB200 variants** | Blackwell NVLink | 121 | GB201/GB202 follow-on |
-
-### Future Architecture Support
-
-| Platform | Architecture | SM | Status |
-|---|---|---|---|
-| **DGX Spark (GB10)** | Blackwell Grace | **103** | ✓ INCLUDED in this build ⭐ |
+| GPU | Codename | Architecture | SM |
+|-----|----------|---------------|----|
+| RTX 4080 | rtx40 | Ada Lovelace | 89 |
+| RTX 4090 | rtx40 | Ada Lovelace | 89 |
+| RTX 5080 | rtx50 | Blackwell GB20x | 120 |
+| RTX 5090 | rtx50 | Blackwell GB20x | 120 |
+| DGX Spark (GB10) | gb10 | Blackwell Grace | 121 |
 
 ## Build Environment
 
@@ -71,123 +48,76 @@ Library names follow the convention documented in
 - **Build Tool**: Ninja
 - **C++ Standard**: C++17
 
-## Supported Features by Architecture Tier
+## Supported Features by Architecture
 
-| Feature | Ada (89) | Hopper (90a) | Blackwell DC (100f/101) | DGX Spark (103) | Blackwell Consumer/NVL (120/121) |
-|---------|---|---|---|---|---|
-| Tensor Float 32 (TF32) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Bfloat16 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Float8 (E4M3/E5M2) | Limited | ✓ | ✓ | ✓ | ✓ |
-| Async Execution | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Dynamic Parallelism | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Warp Specialized Kernels | - | ✓ | ✓ | ✓ | ✓ |
-| Hopper Tensor Primitives | - | ✓ | ✓ | ✓ | ✓ |
-| Blackwell Matrix Engines | - | - | ✓ | ✓ | ✓ |
-| Grace CPU NVLink | - | - | - | ✓ | - |
+| Feature | RTX 40 / Ada (89) | RTX 50 / Blackwell (120) | GB10 / Blackwell Grace (121) |
+|---------|---|---|---|
+| Tensor Float 32 (TF32) | ✓ | ✓ | ✓ |
+| Bfloat16 | ✓ | ✓ | ✓ |
+| Float8 (E4M3/E5M2) | Limited | ✓ | ✓ |
+| Async Execution | ✓ | ✓ | ✓ |
+| Dynamic Parallelism | ✓ | ✓ | ✓ |
+| Blackwell Matrix Engines | - | ✓ | ✓ |
+| Grace CPU NVLink-C2C | - | - | ✓ |
 
 ## Machine Card Support Matrix
 
-### Consumer GPUs (RTX 40/50 Series)
+**RTX 40 / Ada Lovelace (SM 89)**
+- RTX 4080 (GDDR6X, 16GB)
+- RTX 4090 (GDDR6X, 24GB)
 
-**Ada Lovelace (Entry Point — SM 89)**
-- RTX 4080 (GDDR6X, 16GB) — Consumer entry point for cuVS
-- RTX 4090 (GDDR6X, 24GB) — Consumer high-end (Ada)
+**RTX 50 / Blackwell (SM 120)**
+- RTX 5080 (GDDR7, GB203 die)
+- RTX 5090 (GDDR7, GB202 die)
 
-**Blackwell GeForce (Next Generation — SM 120) ⭐**
-- RTX 5080 (GDDR7, GB203 die) — Next-gen mid-tier ⭐
-- RTX 5090 (GDDR7, GB202 die) — Next-gen flagship ⭐⭐
-
-### Professional GPUs
-
-**Ada Lovelace (SM 89)**
-- NVIDIA RTX 6000 Ada (48GB GDDR6) — Professional workstation
-- NVIDIA L40 (48GB GDDR6) — Ada compute engine
-- NVIDIA L40S (48GB GDDR6) — Enhanced L40
-
-**Hopper (SM 90a)**
-- NVIDIA H100 SXM (80GB HBM3) — Datacenter GPU
-- NVIDIA H100 PCIe (80GB HBM3) — Datacenter GPU
-- NVIDIA H200 (141GB HBM3e) — High-memory Hopper
-
-**Blackwell Data Center (SM 100f / 101)**
-- NVIDIA B100 (192GB HBM3e) — Blackwell data center
-- NVIDIA B200 (192GB HBM3e) — Blackwell data center flagship
-- NVIDIA B10x mid-tier variants — SM 101
-
-**DGX Spark / Grace Blackwell (SM 103) ⭐**
+**GB10 / Grace Blackwell (SM 121)**
 - NVIDIA DGX Spark (GB10 Grace Blackwell Superchip)
   - 128GB unified LPDDR5X memory (CPU+GPU shared)
-  - GB10 Blackwell GPU + Grace CPU arm64
-  - arm64 build target (`aarch64`)
-
-**Blackwell NVLink Systems (SM 120a / 121)**
-- NVIDIA GB200 NVL72 — 72× GB200 GPU system
-- NVIDIA GB200 NVLink Pod
-- GB201/GB202 follow-on variants
-
-## Performance Optimization Notes
-
-- SM 89: Ada tensor cores, GDDR6X optimized memory access
-- SM 90a: Hopper async copy (TMA), warp-specialized cooperative kernels
-- SM 100f: Blackwell data center with FP8 first-class support
-- SM 101: Blackwell mid-tier data center variant
-- SM 103: DGX Spark GB10 — optimized for NVLink-C2C unified memory topology ⭐
-- SM 120a: GB200 NVL tensor-core optimized with cluster launch
-- SM 120: Consumer Blackwell (RTX 5080/5090) and GB200 NVL systems ⭐⭐
-- SM 121: Next Blackwell variant kernels (GB201/GB202)
+  - GB10 Blackwell GPU + Grace CPU, aarch64 build target
+  - NVLink-C2C interconnect between CPU and GPU
 
 ## Validation & Testing
 
-All architectures compiled with `-real` suffix:
-- Real binary code generation (no fallback to virtual/PTX)
-- SASS (native machine code) compilation for direct execution
-- Verified on real hardware during CI
+All architectures compiled with `-real` (native SASS, no PTX/JIT fallback).
 
 **Tested GPU Architectures:**
-- SM 89:   RTX 4080/4090, RTX 6000 Ada, L40/L40S ✓
-- SM 90a:  H100, H200 ✓
-- SM 100f: B100, B200 ✓
-- SM 101:  B10x mid-tier Blackwell ✓
-- SM 103:  DGX Spark (GB10 Grace Blackwell) ⭐ ✓
-- SM 120a: GB200 NVL72 tensor-optimized ✓
-- SM 120:  RTX 5080/5090 (GB20x), GB200 NVL ⭐⭐ ✓
-- SM 121:  GB201/GB202 Blackwell follow-on ✓
+- SM 89:  RTX 4080/4090 ✓
+- SM 120: RTX 5080/5090 ✓
+- SM 121: DGX Spark (GB10 Grace Blackwell) ✓
 
 ## Release Compatibility
 
 - ✓ Compatible with CUDA 13.2 runtime and above
-- ✓ Supported GPU range: RTX 4080 (SM 89) through GB200 NVL72 (SM 121)
-- ✓ DGX Spark (GB10 Grace Blackwell, SM 103) explicitly included
-- ✓ Consumer RTX 5080/5090 (Blackwell GB20x, SM 120) included
-- ✓ Datacenter B100/B200/GB200 included
-- ⚠ Pre-Ada GPUs (RTX 3090 and older) require separate legacy build
+- ✓ RTX 4080/4090 (SM 89), RTX 5080/5090 (SM 120), DGX Spark GB10 (SM 121)
+- ⚠ Pre-Ada GPUs (RTX 3090 and older) require a separate legacy build
+- ⚠ Datacenter/professional GPUs (H100/H200, B100/B200, GB200, L40/L40S,
+  RTX 6000 Ada) are not built by this repo
 
-## DGX Spark Build Notes
+## GB10 Build Notes
 
-The DGX Spark uses the **GB10 Grace Blackwell Superchip** (SM 103), distributed
-as a **separate aarch64 library: `libcuvs-aarch64-cu132-sm103.so`**.
+The DGX Spark uses the **GB10 Grace Blackwell Superchip** (SM 121, confirmed
+via `torch` `device_capability` on real hardware), distributed as a
+**separate aarch64 library: `libcuvs-gb10-cu132.so`**.
 
 Built with:
 ```
-bash build_aarch64.sh
-  # CUDA_VER=13.2, CUDA_ARCHS="103-real" (single-arch → -sm103 suffix)
-  # -DCUVS_OUTPUT_NAME=cuvs-aarch64-cu132-sm103
-  # Output: cpp/build/libcuvs-aarch64-cu132-sm103.so
+bash build_gb10.sh
+  # CUDA_VER=13.2, CUDA_ARCHS="121-real" (single-arch)
+  # -DCUVS_OUTPUT_NAME=cuvs-gb10-cu132
+  # Output: cpp/build/libcuvs-gb10-cu132.so
 ```
 
 Key DGX Spark characteristics:
 - **arm64 (aarch64)** system — this binary is built for `sbsa-linux` architecture
-- GB10 Blackwell GPU with 20 Streaming Multiprocessors
+- GB10 Blackwell GPU
 - 128GB unified LPDDR5X memory shared between Grace CPU and GPU
 - NVLink-C2C interconnect between CPU and GPU
-
-This build was compiled on an **aarch64** host (confirmed: `nvcc 13.2.51` on
-`sbsa-linux`), making it fully native for DGX Spark deployment without
-cross-compilation.
 
 ### Deprecated script names
 
 | Old script | New script | Note |
 |------------|------------|------|
-| `build_dgx_spark.sh` | `build_aarch64.sh` | Shim retained for backward compat |
-| `build_ada_blackwell.sh` | `build_x86_64.sh` | Shim retained for backward compat |
+| `build_dgx_spark.sh` | `build_gb10.sh` | Shim retained for backward compat |
+| `build_ada_blackwell.sh` | `build_rtx40.sh` / `build_rtx50.sh` | **Removed, not shimmed** — the old fat binary split into two generations; errors with guidance instead of guessing which one you want |
+| `build_aarch64.sh` (never released) | `build_gb10.sh` | Superseded before shipping |
+| `build_x86_64.sh` (never released) | `build_rtx40.sh` / `build_rtx50.sh` | Superseded before shipping |

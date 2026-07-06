@@ -1,13 +1,13 @@
-# Building cuVS for aarch64 / NVIDIA DGX Spark
+# Building cuVS for GB10 / NVIDIA DGX Spark
 
-This guide builds the cuVS shared library for **aarch64** (ARM), targeting the
-NVIDIA DGX Spark — GB10 Grace Blackwell Superchip, compute capability **SM 103**.
+This guide builds the cuVS shared library for the NVIDIA DGX Spark — GB10
+Grace Blackwell Superchip, compute capability **SM 121** (confirmed via
+`torch` `device_capability` on real hardware).
 
-The aarch64 build is a single-arch build; the output filename carries the SM
-suffix per the naming convention in [WHEEL_NAMING.md](WHEEL_NAMING.md):
-`libcuvs-aarch64-cu132-sm103.so`.
+The GB10 build is a single-arch (aarch64, SM 121) build named by GPU codename
+per [WHEEL_NAMING.md](WHEEL_NAMING.md): `libcuvs-gb10-cu132.so`.
 
-See [BUILD_arch_x86_64.md](BUILD_arch_x86_64.md) for the x86_64 build.
+See [BUILD_rtx.md](BUILD_rtx.md) for the RTX 40 / RTX 50 (x86_64) builds.
 
 ---
 
@@ -22,16 +22,15 @@ See [BUILD_arch_x86_64.md](BUILD_arch_x86_64.md) for the x86_64 build.
 ## Quick start
 
 ```bash
-# aarch64 host only:
-bash build_aarch64.sh
-# produces: cpp/build/libcuvs-aarch64-cu132-sm103.so
+bash build_gb10.sh
+# produces: cpp/build/libcuvs-gb10-cu132.so
 ```
 
 To target a different CUDA version:
 
 ```bash
-CUDA_VER=13.3 bash build_aarch64.sh
-# produces: cpp/build/libcuvs-aarch64-cu133-sm103.so
+CUDA_VER=13.3 bash build_gb10.sh
+# produces: cpp/build/libcuvs-gb10-cu133.so
 ```
 
 ## CUDA version selection
@@ -52,11 +51,10 @@ On a host with multiple toolkits, `CUDA_HOME` auto-resolves to
 
 | Artifact | Location | Notes |
 |----------|----------|-------|
-| `libcuvs-aarch64-cu132-sm103.so` | `cpp/build/` | Single-arch, SM 103 (GB10 Grace Blackwell) |
+| `libcuvs-gb10-cu132.so` | `cpp/build/` | Single-arch, SM 121 (GB10 Grace Blackwell) |
 
-The `cu132`/`sm103` portions track `CUDA_TAG` and `CUDA_ARCHS`. Because the DGX
-Spark build always targets a single GPU arch, the filename carries the `-sm103`
-suffix; see [WHEEL_NAMING.md](WHEEL_NAMING.md).
+The `cu132` portion tracks `CUDA_TAG`; `CUDA_ARCHS` is fixed at `121-real`
+since GB10 is the only chip this build targets.
 
 ## Troubleshooting
 
@@ -66,10 +64,11 @@ suffix; see [WHEEL_NAMING.md](WHEEL_NAMING.md).
   matching toolkit.
 
 **Build runs out of memory**
-- Reduce parallelism: `PARALLEL_LEVEL=4 bash build_aarch64.sh`
+- Reduce parallelism: `PARALLEL_LEVEL=4 bash build_gb10.sh`
 
 ## Note for faiss consumers
 
 The faiss aarch64 build (`zbrad/faiss gpu-cu/scripts/build_lib_aarch64.sh`)
 expects the cuVS library from `${CUVS_DIR}`. Update the filename reference from
-`libcuvs-spark.so` to `libcuvs-aarch64-cu${FAISS_CUDA_TAG}-sm103.so`.
+`libcuvs-spark.so` to `libcuvs-gb10-cu${FAISS_CUDA_TAG}.so`, and the
+`./build_dgx_spark.sh` suggestion in its error message to `./build_gb10.sh`.

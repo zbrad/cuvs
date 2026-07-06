@@ -3,20 +3,23 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
-# cuVS aarch64 Build Script
+# cuVS GB10 Build Script
 # Target: NVIDIA DGX Spark — GB10 Grace Blackwell Superchip (aarch64)
 #
 # Hardware:
-#   GPU:  GB10 Blackwell (SM 103)
+#   GPU:  GB10 Blackwell, compute capability 12.1 (SM 121)
 #   CPU:  Grace arm64 (aarch64 / sbsa-linux)
 #   MEM:  128GB LPDDR5X unified (NVLink-C2C, zero-copy GPU access)
 #
-# Library naming convention (mirrors zbrad/faiss gpu-cu/docs/WHEEL_NAMING.md):
-#   Single-arch build → libcuvs-aarch64-cu<tag>-sm103.so
+# Library naming convention (see gpu-build/docs/WHEEL_NAMING.md): builds are
+# named by GPU codename, mirroring zbrad/vllm's gb10 branch convention
+# (requirements/gb10.txt, tools/build_gb10.sh) rather than by CPU arch/SM
+# number:
+#   libcuvs-gb10-cu<tag>.so
 #
 # To build with a different CUDA version:
-#   CUDA_VER=13.3 bash build_aarch64.sh   →  libcuvs-aarch64-cu133-sm103.so
-#   CUDA_TAG=cu133 bash build_aarch64.sh  →  (same, tag form)
+#   CUDA_VER=13.3 bash build_gb10.sh   →  libcuvs-gb10-cu133.so
+#   CUDA_TAG=cu133 bash build_gb10.sh  →  (same, tag form)
 #
 # See scripts/cuda_env.sh for the CUDA version knob.
 
@@ -24,7 +27,7 @@ set -e
 
 REPODIR=$(cd "$(dirname "$0")"; pwd)
 
-# Source the single CUDA-version knob (sets CUDA_VER, CUDA_TAG, CUDA_HOME, cuvs_sm_suffix)
+# Source the single CUDA-version knob (sets CUDA_VER, CUDA_TAG, CUDA_HOME)
 # shellcheck source=scripts/cuda_env.sh
 source "${REPODIR}/scripts/cuda_env.sh"
 
@@ -33,21 +36,20 @@ ARCH=$(uname -m)
 if [[ "$ARCH" != "aarch64" ]]; then
   echo "ERROR: This script targets aarch64 (DGX Spark / Grace)."
   echo "       Current arch: $ARCH"
-  echo "       For x86_64 discrete GPU builds use: ./build_x86_64.sh"
+  echo "       For x86_64 discrete GPU builds use: ./build_rtx.sh"
   exit 1
 fi
 
-# Single GPU arch → include -sm suffix in library name
-CUDA_ARCHS="103-real"
-SM_SUFFIX=$(cuvs_sm_suffix "$CUDA_ARCHS")              # -sm103
-CUVS_LIB_NAME="cuvs-aarch64-${CUDA_TAG}${SM_SUFFIX}"  # cuvs-aarch64-cu132-sm103
+# GB10 is always a single-arch build: SM 121 (compute capability 12.1).
+CUDA_ARCHS="121-real"
+CUVS_LIB_NAME="cuvs-gb10-${CUDA_TAG}"  # cuvs-gb10-cu132
 
 echo "===================================================="
-echo "cuVS aarch64 Build (DGX Spark)"
+echo "cuVS GB10 Build (DGX Spark)"
 echo "===================================================="
 echo ""
 echo "  Target GPU : GB10 Grace Blackwell Superchip"
-echo "  SM arch    : 103-real"
+echo "  SM arch    : 121-real (compute capability 12.1)"
 echo "  Host arch  : aarch64 (sbsa-linux)"
 echo "  Memory     : 128GB unified LPDDR5X (NVLink-C2C)"
 echo "  CUDA ver   : ${CUDA_VER} (${CUDA_TAG})"
@@ -62,7 +64,7 @@ echo "Cleaning previous build artifacts..."
 cd "$REPODIR"
 ./build.sh clean
 
-echo "Starting lib${CUVS_LIB_NAME} build for DGX Spark (SM 103)..."
+echo "Starting lib${CUVS_LIB_NAME} build for DGX Spark (SM 121)..."
 echo ""
 
 LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-${REPODIR}/cpp/build}"
@@ -102,10 +104,10 @@ fi
 
 echo ""
 echo "===================================================="
-echo "aarch64 Build Complete!"
+echo "GB10 Build Complete!"
 echo "===================================================="
 echo ""
-echo "  ✓ SM 103 (GB10 Grace Blackwell) native binary"
+echo "  ✓ SM 121 (GB10 Grace Blackwell) native binary"
 echo "  ✓ aarch64 host code (Grace CPU)"
 echo "  ✓ Zero-copy NVLink-C2C memory path"
 echo "  ✓ Output: ${LIBDIR}/lib${CUVS_LIB_NAME}.so"
@@ -116,4 +118,5 @@ echo "  ldconfig"
 echo ""
 echo "NOTE for faiss consumers (zbrad/faiss gpu-cu/scripts/build_lib_aarch64.sh):"
 echo "  Library is now: ${LIBDIR}/lib${CUVS_LIB_NAME}.so"
-echo "  Update libcuvs-spark.so references in build_lib_aarch64.sh and build_pkg_aarch64.sh."
+echo "  Update libcuvs-spark.so references to lib${CUVS_LIB_NAME}.so, and"
+echo "  ./build_dgx_spark.sh references to ./build_gb10.sh."

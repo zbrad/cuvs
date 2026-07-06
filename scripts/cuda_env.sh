@@ -7,15 +7,17 @@
 #
 # Specify the version at build time with EITHER variable (the other is derived):
 #
-#   CUDA_VER=13.3  bash build_aarch64.sh    # human-readable form
-#   CUDA_TAG=cu133 bash build_aarch64.sh    # short tag form
+#   CUDA_VER=13.3  bash build_gb10.sh    # human-readable form
+#   CUDA_TAG=cu133 bash build_gb10.sh    # short tag form
 #
 # Defaults to CUDA 13.2 (cu132) when neither is set.
 #
-# The CUDA version drives all library and script names:
-#   C++ library  : libcuvs-{cpu_arch}-${CUDA_TAG}[-sm{sm}].so
-#     single GPU arch  ->  include -sm suffix  (e.g. libcuvs-aarch64-cu132-sm103.so)
-#     multi  GPU arch  ->  omit   -sm suffix  (e.g. libcuvs-x86_64-cu132.so)
+# The CUDA version drives all library and script names, which are keyed by
+# GPU codename rather than CPU arch or SM number (mirrors zbrad/vllm's gb10
+# branch convention, e.g. requirements/gb10.txt / tools/build_gb10.sh):
+#   C++ library  : libcuvs-{codename}-${CUDA_TAG}.so
+#     e.g. libcuvs-gb10-cu132.so (DGX Spark, aarch64, SM 121)
+#          libcuvs-rtx-cu132.so  (x86_64 workstation/datacenter, multi-arch)
 #
 # Multi-toolkit hosts: CUDA_HOME is auto-resolved to /usr/local/cuda-<CUDA_VER>
 # when that directory exists. Set CUDA_HOME explicitly to force a path.
@@ -54,18 +56,3 @@ if command -v nvcc >/dev/null 2>&1; then
     fi
     unset _nvcc_ver
 fi
-
-# Print "-sm<arch>" when the build targets exactly one GPU arch, else nothing.
-# Used to tag single-arch libraries (e.g. libcuvs-aarch64-cu132-sm103.so).
-# Multi-arch builds (e.g. libcuvs-x86_64-cu132.so) get no suffix.
-# Reads CUDA_ARCHS; tolerant of ";"/","/"\;" separators and -real/-virtual suffixes.
-cuvs_sm_suffix() {
-    local archs="${1:-${CUDA_ARCHS:-}}"
-    local uniq
-    uniq=$(printf '%s' "$archs" \
-        | sed -E 's/[\\,;]+/\n/g; s/-(real|virtual)//g; s/[[:blank:]]//g' \
-        | sed '/^$/d' | sort -u)
-    if [ -n "$uniq" ] && [ "$(printf '%s\n' "$uniq" | wc -l | tr -d ' ')" -eq 1 ]; then
-        printf -- '-sm%s' "$uniq"
-    fi
-}
