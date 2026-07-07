@@ -16,8 +16,9 @@
 # GPU codename rather than CPU arch or SM number (mirrors zbrad/vllm's gb10
 # branch convention, e.g. requirements/gb10.txt / tools/build_gb10.sh):
 #   C++ library  : libcuvs-{codename}-${CUDA_TAG}.so
-#     e.g. libcuvs-gb10-cu132.so (DGX Spark, aarch64, SM 121)
-#          libcuvs-rtx-cu132.so  (x86_64 workstation/datacenter, multi-arch)
+#     e.g. libcuvs-gb10-cu132.so  (DGX Spark, aarch64, SM 121)
+#          libcuvs-rtx40-cu132.so (Ada Lovelace, x86_64, SM 89)
+#          libcuvs-rtx50-cu132.so (Blackwell, x86_64, SM 120)
 #
 # Multi-toolkit hosts: CUDA_HOME is auto-resolved to /usr/local/cuda-<CUDA_VER>
 # when that directory exists. Set CUDA_HOME explicitly to force a path.
@@ -37,11 +38,28 @@ fi
 export CUDA_VER="${CUDA_VER:-13.2}"
 export CUDA_TAG="${CUDA_TAG:-cu${CUDA_VER//./}}"
 
+# List installed toolkits under /usr/local/cuda-<ver> (glob, sorted). Used to
+# give actionable guidance instead of a bare "wrong version" warning.
+cuvs_installed_cuda_toolkits() {
+    local d
+    for d in /usr/local/cuda-[0-9]*; do
+        [ -d "$d" ] && basename "$d" | sed 's/^cuda-//'
+    done | sort -V
+}
+
 # --- Resolve CUDA_HOME to the matching toolkit when not explicitly set ---
 if [ -z "${CUDA_HOME:-}" ]; then
     if [ -d "/usr/local/cuda-${CUDA_VER}" ]; then
         export CUDA_HOME="/usr/local/cuda-${CUDA_VER}"
     else
+        echo "[cuda_env] WARNING: /usr/local/cuda-${CUDA_VER} not found; falling back to /usr/local/cuda (whatever version that symlinks to)." >&2
+        _cuvs_installed="$(cuvs_installed_cuda_toolkits | tr '\n' ' ')"
+        if [ -n "$_cuvs_installed" ]; then
+            echo "[cuda_env]          Installed toolkits: ${_cuvs_installed}. Set CUDA_VER to one of these, or CUDA_HOME to an explicit path." >&2
+        else
+            echo "[cuda_env]          No /usr/local/cuda-<ver> toolkits found at all." >&2
+        fi
+        unset _cuvs_installed
         export CUDA_HOME="/usr/local/cuda"
     fi
 fi
@@ -53,6 +71,9 @@ if command -v nvcc >/dev/null 2>&1; then
     if [ -n "$_nvcc_ver" ] && [ "$_nvcc_ver" != "$CUDA_VER" ]; then
         echo "[cuda_env] WARNING: nvcc reports CUDA $_nvcc_ver but CUDA_VER=$CUDA_VER" >&2
         echo "[cuda_env]          (CUDA_HOME=$CUDA_HOME). Set CUDA_HOME or CUDA_VER to match." >&2
+        _cuvs_installed="$(cuvs_installed_cuda_toolkits | tr '\n' ' ')"
+        [ -n "$_cuvs_installed" ] && echo "[cuda_env]          Installed toolkits: ${_cuvs_installed}" >&2
+        unset _cuvs_installed
     fi
     unset _nvcc_ver
 fi
