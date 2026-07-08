@@ -68,7 +68,6 @@ since GB10 is the only chip this build targets.
 
 ## Note for faiss consumers
 
-The faiss aarch64 build (`zbrad/faiss gpu-cu/scripts/build_lib_aarch64.sh`)
-expects the cuVS library from `${CUVS_DIR}`. Update the filename reference from
-`libcuvs-spark.so` to `libcuvs-gb10-cu${FAISS_CUDA_TAG}.so`, and the
-`./build_dgx_spark.sh` suggestion in its error message to `./build_gb10.sh`.
+`zbrad/faiss gpu-cu/scripts/build_lib_gb10.sh` expects
+`libcuvs-gb10-${FAISS_CUDA_TAG}.so` from `${CUVS_DIR}` and suggests
+`./build_gb10.sh` in its error messages.

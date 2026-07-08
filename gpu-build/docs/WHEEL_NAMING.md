@@ -110,20 +110,10 @@ Ada-through-Blackwell-datacenter — it would need at least two virtual targets
 
 ## Downstream: faiss `gpu-cu/` build
 
-The faiss aarch64 build (`zbrad/faiss gpu-cu/scripts/build_lib_aarch64.sh`)
-currently expects `libcuvs-spark.so` from this repo's `cpp/build/`, and
-already independently uses `CUDA_ARCHS="121-real"` with comments identifying
-it as "SM 121 — GB10 Grace Blackwell" — consistent with the SM 121 fix in this
-revision, and further confirmation that `103` (this scheme's previous value)
-was wrong. After this PR merges, the library name changes to
-`libcuvs-gb10-cu132.so`.
-
-Required update in faiss (tracked separately, see faiss's own
-`gpu-cu/docs/WHEEL_NAMING.md`):
-
-| File | Old reference | New reference |
-|------|--------------|---------------|
-| `gpu-cu/scripts/build_lib_aarch64.sh` | `libcuvs-spark.so` | `libcuvs-gb10-cu${FAISS_CUDA_TAG}.so` |
-| `gpu-cu/scripts/build_pkg_aarch64.sh` | `libcuvs-spark.so` | `libcuvs-gb10-cu${FAISS_CUDA_TAG}.so` |
-| `gpu-cu/scripts/build_wheel_aarch64.sh` | `libcuvs-spark.so`, `./build_dgx_spark.sh` | `libcuvs-gb10-cu${FAISS_CUDA_TAG}.so`, `./build_gb10.sh` |
-| `gpu-cu/scripts/package_wheel_aarch64.sh` | `libcuvs-spark.so` | `libcuvs-gb10-cu${FAISS_CUDA_TAG}.so` |
+`zbrad/faiss`'s `gpu-cu/scripts/build_lib_gb10.sh`, `build_lib_rtx40.sh`, and
+`build_lib_rtx50.sh` each consume the matching `libcuvs-{codename}-${FAISS_CUDA_TAG}.so`
+from this repo's `cpp/build/` — e.g. `build_lib_gb10.sh` looks for
+`libcuvs-gb10-${FAISS_CUDA_TAG}.so`. The old `build_lib_aarch64.sh` /
+`libcuvs-spark.so` naming has already been renamed on the faiss side to match
+this scheme. See faiss's own `gpu-cu/docs/WHEEL_NAMING.md` for the full
+naming scheme there.
