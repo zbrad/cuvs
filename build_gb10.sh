@@ -41,7 +41,10 @@ if [[ "$ARCH" != "aarch64" ]]; then
 fi
 
 # GB10 is always a single-arch build: SM 121 (compute capability 12.1).
-CUDA_ARCHS="121-real"
+# "a" suffix targets the Blackwell family-specific SASS variant (required for
+# GB10-specific tensor core instructions not present in the compatible/generic
+# sm_121 target).
+CUDA_ARCHS="121a-real"
 CUVS_LIB_NAME="cuvs-gb10-${CUDA_TAG}"  # cuvs-gb10-cu132
 
 echo "===================================================="
@@ -49,7 +52,7 @@ echo "cuVS GB10 Build (DGX Spark)"
 echo "===================================================="
 echo ""
 echo "  Target GPU : GB10 Grace Blackwell Superchip"
-echo "  SM arch    : 121-real (compute capability 12.1)"
+echo "  SM arch    : 121a-real (compute capability 12.1, Blackwell family-specific)"
 echo "  Host arch  : aarch64 (sbsa-linux)"
 echo "  Memory     : 128GB unified LPDDR5X (NVLink-C2C)"
 echo "  CUDA ver   : ${CUDA_VER} (${CUDA_TAG})"

@@ -51,8 +51,8 @@ switched to the vLLM-style codename convention on 2026-07-06.
 | Build | Script | CPU arch | CUDA_ARCHS | Output library |
 |-------|--------|----------|------------|-----------------|
 | RTX 40 / Ada Lovelace | `build_rtx40.sh` | x86_64 | `89-real` | `libcuvs-rtx40-cu132.so` |
-| RTX 50 / Blackwell | `build_rtx50.sh` | x86_64 | `120-real` | `libcuvs-rtx50-cu132.so` |
-| GB10 / DGX Spark | `build_gb10.sh` | aarch64 | `121-real` | `libcuvs-gb10-cu132.so` |
+| RTX 50 / Blackwell | `build_rtx50.sh` | x86_64 | `120a-real` | `libcuvs-rtx50-cu132.so` |
+| GB10 / DGX Spark | `build_gb10.sh` | aarch64 | `121a-real` | `libcuvs-gb10-cu132.so` |
 
 The `cu132` portion tracks `CUDA_TAG`; bump `CUDA_VER` in `scripts/cuda_env.sh`
 (or pass it at the command line) and all names update automatically.

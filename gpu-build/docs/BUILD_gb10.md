@@ -53,8 +53,9 @@ On a host with multiple toolkits, `CUDA_HOME` auto-resolves to
 |----------|----------|-------|
 | `libcuvs-gb10-cu132.so` | `cpp/build/` | Single-arch, SM 121 (GB10 Grace Blackwell) |
 
-The `cu132` portion tracks `CUDA_TAG`; `CUDA_ARCHS` is fixed at `121-real`
-since GB10 is the only chip this build targets.
+The `cu132` portion tracks `CUDA_TAG`; `CUDA_ARCHS` is fixed at `121a-real`
+since GB10 is the only chip this build targets. The `a` suffix targets the
+Blackwell family-specific SASS variant.
 
 ## Troubleshooting
 

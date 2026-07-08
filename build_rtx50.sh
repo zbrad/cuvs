@@ -33,7 +33,10 @@ REPODIR=$(cd "$(dirname "$0")"; pwd)
 source "${REPODIR}/scripts/cuda_env.sh"
 
 # Single-arch build: SM 120 (Blackwell consumer) only.
-CUDA_ARCHS="120-real"
+# "a" suffix targets the Blackwell family-specific SASS variant (required for
+# RTX 50-specific tensor core instructions not present in the compatible/
+# generic sm_120 target).
+CUDA_ARCHS="120a-real"
 CUVS_LIB_NAME="cuvs-rtx50-${CUDA_TAG}"  # cuvs-rtx50-cu132
 
 echo "===================================================="
@@ -41,7 +44,7 @@ echo "cuVS RTX 50 Build (Blackwell)"
 echo "===================================================="
 echo ""
 echo "  Target GPU : RTX 5080, RTX 5090"
-echo "  SM arch    : 120-real (Blackwell)"
+echo "  SM arch    : 120a-real (Blackwell family-specific)"
 echo "  Host arch  : x86_64"
 echo "  CUDA ver   : ${CUDA_VER} (${CUDA_TAG})"
 echo "  CUDA home  : ${CUDA_HOME}"

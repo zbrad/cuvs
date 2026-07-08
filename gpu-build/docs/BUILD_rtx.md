@@ -58,7 +58,7 @@ full version/naming scheme.
 | Codename | SM | Target GPUs | Script |
 |----------|----|-------------|--------|
 | rtx40 | 89-real | RTX 4080, RTX 4090 | `build_rtx40.sh` |
-| rtx50 | 120-real | RTX 5080, RTX 5090 | `build_rtx50.sh` |
+| rtx50 | 120a-real | RTX 5080, RTX 5090 | `build_rtx50.sh` |
 
 ## Build output
 

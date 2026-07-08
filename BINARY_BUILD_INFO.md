@@ -102,7 +102,7 @@ via `torch` `device_capability` on real hardware), distributed as a
 Built with:
 ```
 bash build_gb10.sh
-  # CUDA_VER=13.2, CUDA_ARCHS="121-real" (single-arch)
+  # CUDA_VER=13.2, CUDA_ARCHS="121a-real" (single-arch, Blackwell family-specific)
   # -DCUVS_OUTPUT_NAME=cuvs-gb10-cu132
   # Output: cpp/build/libcuvs-gb10-cu132.so
 ```
