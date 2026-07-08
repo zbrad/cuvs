@@ -9,7 +9,8 @@
 **Supported GPU Range:** RTX 4080/4090 (RTX 40), RTX 5080/5090 (RTX 50), DGX Spark (GB10)
 
 Builds are single-arch and named by GPU codename (not CPU arch or SM number),
-mirroring zbrad/vllm's `gb10` branch convention. Datacenter/professional
+mirroring zbrad/vllm's `native-builds` branch convention (originally
+established on that repo's `gb10` branch, since renamed). Datacenter/professional
 architectures (Hopper, Blackwell DC, GB200, and Ada professional parts like
 L40/L40S/RTX 6000 Ada) are intentionally **not** built here — this repo only
 targets owned/verified consumer + DGX Spark hardware. See

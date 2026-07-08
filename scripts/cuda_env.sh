@@ -13,8 +13,9 @@
 # Defaults to CUDA 13.2 (cu132) when neither is set.
 #
 # The CUDA version drives all library and script names, which are keyed by
-# GPU codename rather than CPU arch or SM number (mirrors zbrad/vllm's gb10
-# branch convention, e.g. requirements/gb10.txt / tools/build_gb10.sh):
+# GPU codename rather than CPU arch or SM number (mirrors zbrad/vllm's
+# native-builds branch convention -- originally its gb10 branch, since
+# renamed -- e.g. requirements/gb10.txt / tools/build_gb10.sh):
 #   C++ library  : libcuvs-{codename}-${CUDA_TAG}.so
 #     e.g. libcuvs-gb10-cu132.so  (DGX Spark, aarch64, SM 121)
 #          libcuvs-rtx40-cu132.so (Ada Lovelace, x86_64, SM 89)

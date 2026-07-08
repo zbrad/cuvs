@@ -12,9 +12,9 @@
 #   MEM:  128GB LPDDR5X unified (NVLink-C2C, zero-copy GPU access)
 #
 # Library naming convention (see gpu-build/docs/WHEEL_NAMING.md): builds are
-# named by GPU codename, mirroring zbrad/vllm's gb10 branch convention
-# (requirements/gb10.txt, tools/build_gb10.sh) rather than by CPU arch/SM
-# number:
+# named by GPU codename, mirroring zbrad/vllm's native-builds branch convention
+# (requirements/gb10.txt, tools/build_gb10.sh -- originally established on
+# that repo's gb10 branch, since renamed) rather than by CPU arch/SM number:
 #   libcuvs-gb10-cu<tag>.so
 #
 # To build with a different CUDA version:

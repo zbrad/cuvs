@@ -4,9 +4,12 @@ _Last updated: 2026-07-06_
 
 This document records the naming/versioning conventions for cuVS GPU libraries
 and build scripts. Builds are named by **GPU codename** rather than CPU arch
-or SM number, mirroring the convention used in zbrad/vllm's `gb10` branch
-(`requirements/gb10.txt`, `tools/build_gb10.sh`, `tools/run_gb10.sh`). This
-supersedes an earlier CPU-arch/SM-number scheme (`libcuvs-aarch64-cu132-sm103.so`
+or SM number, mirroring the convention used in zbrad/vllm's `native-builds`
+branch (`requirements/gb10.txt`, `tools/build_gb10.sh`, `tools/run_gb10.sh`;
+originally established on that repo's `gb10` branch, renamed to
+`native-builds` on 2026-07-08 for naming consistency with this repo and
+zbrad/faiss, though that branch itself only carries GB10 support today).
+This supersedes an earlier CPU-arch/SM-number scheme (`libcuvs-aarch64-cu132-sm103.so`
 etc.) that mirrored `zbrad/faiss gpu-cu/docs/WHEEL_NAMING.md` instead —
 switched to the vLLM-style codename convention on 2026-07-06.
 

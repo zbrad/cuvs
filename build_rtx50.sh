@@ -14,7 +14,8 @@
 # entirely rather than bundled in alongside this one.
 #
 # Library naming convention (see gpu-build/docs/WHEEL_NAMING.md): builds are
-# named by GPU codename, mirroring zbrad/vllm's gb10 branch convention:
+# named by GPU codename, mirroring zbrad/vllm's native-builds branch convention
+# (originally established on that repo's gb10 branch, since renamed):
 #   libcuvs-rtx50-cu<tag>.so
 #
 # To build with a different CUDA version:
