@@ -17,9 +17,8 @@
 # branch convention, e.g. requirements/gb10.txt / tools/build_gb10.sh):
 #   C++ library  : libcuvs-{codename}-${CUDA_TAG}.so
 #     e.g. libcuvs-gb10-cu132.so  (DGX Spark, aarch64, SM 121)
-#
-# This branch covers GB10 only. The `rtx` branch adds rtx40/rtx50 codenames
-# (Ada Lovelace / Blackwell, x86_64) on top of this same convention.
+#          libcuvs-rtx40-cu132.so (Ada Lovelace, x86_64, SM 89)
+#          libcuvs-rtx50-cu132.so (Blackwell, x86_64, SM 120)
 #
 # Multi-toolkit hosts: CUDA_HOME is auto-resolved to /usr/local/cuda-<CUDA_VER>
 # when that directory exists. Set CUDA_HOME explicitly to force a path.
