@@ -1,45 +1,34 @@
 # cuVS Binary Build Information
-# CUDA 13.2 - RTX 40, RTX 50 & DGX Spark (GB10)
+# CUDA 13.2 - DGX Spark (GB10)
 
 ## Build Summary
 
-**Binary Release Name:** cuVS CUDA 13.2 - RTX40/RTX50/GB10
+**Binary Release Name:** cuVS CUDA 13.2 - GB10
 **Build Date:** 2026-03-31
 **CUDA Version:** 13.2.51
-**Supported GPU Range:** RTX 4080/4090 (RTX 40), RTX 5080/5090 (RTX 50), DGX Spark (GB10)
+**Supported GPU Range:** DGX Spark (GB10)
 
 Builds are single-arch and named by GPU codename (not CPU arch or SM number),
 mirroring zbrad/vllm's `gb10` branch convention. Datacenter/professional
 architectures (Hopper, Blackwell DC, GB200, and Ada professional parts like
 L40/L40S/RTX 6000 Ada) are intentionally **not** built here — this repo only
-targets owned/verified consumer + DGX Spark hardware. See
-`gpu-build/docs/WHEEL_NAMING.md` for the full rationale and naming rules.
+targets owned/verified hardware. See `gpu-build/docs/WHEEL_NAMING.md` for the
+full rationale and naming rules. A separate `rtx` branch adds RTX 40/RTX 50
+(x86_64 consumer GPU) builds on top of this one.
 
 ### Library Binaries
 
 | Library | Platform | Target | SM | Build script |
 |---------|----------|--------|----|--------------|
-| `libcuvs-rtx40-cu132.so` | x86_64 | RTX 4080, RTX 4090 (Ada Lovelace) | 89 | `build_rtx40.sh` |
-| `libcuvs-rtx50-cu132.so` | x86_64 | RTX 5080, RTX 5090 (Blackwell) | 120 | `build_rtx50.sh` |
 | `libcuvs-gb10-cu132.so` | aarch64 | DGX Spark — GB10 Grace Blackwell | 121 | `build_gb10.sh` |
 
 **Naming rules:**
-- GPU codename (`gb10` / `rtx40` / `rtx50`) is in the library filename; CPU
-  arch and SM number are not, since each codename implies exactly one of each.
+- GPU codename (`gb10`) is in the library filename; CPU arch and SM number
+  are not, since the codename implies exactly one of each.
 - CUDA version (`cu132`) is derived from the single knob in `scripts/cuda_env.sh`.
-- Every build here is single-arch, compiled `-real` (native SASS, no PTX/JIT
+- The build is single-arch, compiled `-real` (native SASS, no PTX/JIT
   fallback).
 - The build directory (`cpp/build/`) is version-agnostic; no CUDA version in the path.
-
-### Consumer GPU Support
-
-| GPU | Codename | Architecture | SM |
-|-----|----------|---------------|----|
-| RTX 4080 | rtx40 | Ada Lovelace | 89 |
-| RTX 4090 | rtx40 | Ada Lovelace | 89 |
-| RTX 5080 | rtx50 | Blackwell GB20x | 120 |
-| RTX 5090 | rtx50 | Blackwell GB20x | 120 |
-| DGX Spark (GB10) | gb10 | Blackwell Grace | 121 |
 
 ## Build Environment
 
@@ -50,25 +39,17 @@ targets owned/verified consumer + DGX Spark hardware. See
 
 ## Supported Features by Architecture
 
-| Feature | RTX 40 / Ada (89) | RTX 50 / Blackwell (120) | GB10 / Blackwell Grace (121) |
-|---------|---|---|---|
-| Tensor Float 32 (TF32) | ✓ | ✓ | ✓ |
-| Bfloat16 | ✓ | ✓ | ✓ |
-| Float8 (E4M3/E5M2) | Limited | ✓ | ✓ |
-| Async Execution | ✓ | ✓ | ✓ |
-| Dynamic Parallelism | ✓ | ✓ | ✓ |
-| Blackwell Matrix Engines | - | ✓ | ✓ |
-| Grace CPU NVLink-C2C | - | - | ✓ |
+| Feature | GB10 / Blackwell Grace (121) |
+|---------|---|
+| Tensor Float 32 (TF32) | ✓ |
+| Bfloat16 | ✓ |
+| Float8 (E4M3/E5M2) | ✓ |
+| Async Execution | ✓ |
+| Dynamic Parallelism | ✓ |
+| Blackwell Matrix Engines | ✓ |
+| Grace CPU NVLink-C2C | ✓ |
 
 ## Machine Card Support Matrix
-
-**RTX 40 / Ada Lovelace (SM 89)**
-- RTX 4080 (GDDR6X, 16GB)
-- RTX 4090 (GDDR6X, 24GB)
-
-**RTX 50 / Blackwell (SM 120)**
-- RTX 5080 (GDDR7, GB203 die)
-- RTX 5090 (GDDR7, GB202 die)
 
 **GB10 / Grace Blackwell (SM 121)**
 - NVIDIA DGX Spark (GB10 Grace Blackwell Superchip)
@@ -78,20 +59,19 @@ targets owned/verified consumer + DGX Spark hardware. See
 
 ## Validation & Testing
 
-All architectures compiled with `-real` (native SASS, no PTX/JIT fallback).
+Compiled with `-real` (native SASS, no PTX/JIT fallback).
 
 **Tested GPU Architectures:**
-- SM 89:  RTX 4080/4090 ✓
-- SM 120: RTX 5080/5090 ✓
-- SM 121: DGX Spark (GB10 Grace Blackwell) ✓
+- SM 121: DGX Spark (GB10 Grace Blackwell) ✓ — verified end-to-end on real
+  hardware at both CUDA 13.2 and CUDA 13.3.
 
 ## Release Compatibility
 
 - ✓ Compatible with CUDA 13.2 runtime and above
-- ✓ RTX 4080/4090 (SM 89), RTX 5080/5090 (SM 120), DGX Spark GB10 (SM 121)
-- ⚠ Pre-Ada GPUs (RTX 3090 and older) require a separate legacy build
+- ✓ DGX Spark GB10 (SM 121)
 - ⚠ Datacenter/professional GPUs (H100/H200, B100/B200, GB200, L40/L40S,
   RTX 6000 Ada) are not built by this repo
+- See the `rtx` branch for RTX 40/RTX 50 (x86_64 consumer GPU) support
 
 ## GB10 Build Notes
 
@@ -118,6 +98,4 @@ Key DGX Spark characteristics:
 | Old script | New script | Note |
 |------------|------------|------|
 | `build_dgx_spark.sh` | `build_gb10.sh` | Shim retained for backward compat |
-| `build_ada_blackwell.sh` | `build_rtx40.sh` / `build_rtx50.sh` | **Removed, not shimmed** — the old fat binary split into two generations; errors with guidance instead of guessing which one you want |
 | `build_aarch64.sh` (never released) | `build_gb10.sh` | Superseded before shipping |
-| `build_x86_64.sh` (never released) | `build_rtx40.sh` / `build_rtx50.sh` | Superseded before shipping |
