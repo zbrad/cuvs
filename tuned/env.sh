@@ -159,7 +159,7 @@ gpu_tuned_verify_arch() {
 # this branch, not just genuine drift -- so this deliberately WARNS, it does
 # not fail (same precedent as the nvcc-version mismatch check above).
 #
-# What this DOES catch, meaningfully: this cuVS native-builds system has no
+# What this DOES catch, meaningfully: this cuVS tuned-builds system has no
 # pin to your own raft fork (zbrad/raft) at all -- confirmed, no RAFT_FORK/
 # RAFT_PINNED_TAG/CMAKE_PREFIX_PATH override anywhere in tuned/build.sh. It
 # always CPM-clones upstream rapidsai/raft's main branch fresh, independent
