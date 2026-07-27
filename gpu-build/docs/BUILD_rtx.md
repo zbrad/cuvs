@@ -68,7 +68,7 @@ full version/naming scheme.
 | Artifact | Location | Notes |
 |----------|----------|-------|
 | `libcuvs-rtx40-cu132.so` | `cpp/build/` | Single-arch, SM 89 |
-| `libcuvs-rtx50-cu132.so` | `cpp/build/` | Single-arch, SM 120 |
+| `libcuvs-rtx50-cu132.so` | `cpp/build/` | Single-arch, SM 120a (Blackwell family-specific) |
 
 ## Troubleshooting
 
