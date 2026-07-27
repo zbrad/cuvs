@@ -33,6 +33,10 @@ REPODIR=$(cd "$(dirname "$0")"; pwd)
 # Source the single CUDA-version knob (sets CUDA_VER, CUDA_TAG, CUDA_HOME)
 # shellcheck source=scripts/cuda_env.sh
 source "${REPODIR}/scripts/cuda_env.sh"
+# shellcheck source=scripts/version_check.sh
+source "${REPODIR}/scripts/version_check.sh"
+# shellcheck source=scripts/verify_arch.sh
+source "${REPODIR}/scripts/verify_arch.sh"
 
 # Single-arch build: SM 89 (Ada Lovelace) only.
 CUDA_ARCHS="89-real"
@@ -83,6 +87,12 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   -DBUILD_SHARED_LIBS=ON \
   "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}"
 
+# Surface which raft this configure actually fetched (this repo tracks
+# upstream raft's main branch, not a pinned release, so version drift here
+# is expected -- see scripts/version_check.sh for why this is informational,
+# not a hard gate).
+cuvs_check_raft_version "${LIBCUVS_BUILD_DIR}" "${REPODIR}"
+
 cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c install
 
 # Verify output
@@ -90,6 +100,7 @@ LIBDIR="${REPODIR}/cpp/build"
 EXPECTED_LIB="${LIBDIR}/lib${CUVS_LIB_NAME}.so"
 if [[ -f "${EXPECTED_LIB}" ]]; then
   echo "  Library built: ${EXPECTED_LIB} ($(du -h "${EXPECTED_LIB}" | cut -f1))"
+  cuvs_verify_arch "${EXPECTED_LIB}" "${CUDA_ARCHS}" || exit 1
 else
   echo "WARNING: Expected lib${CUVS_LIB_NAME}.so not found in ${LIBDIR}"
   echo "  Files present: $(ls "${LIBDIR}"/libcuvs*.so 2>/dev/null || echo 'none')"
