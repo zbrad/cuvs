@@ -3,8 +3,11 @@
 This guide builds the cuVS shared library for consumer x86_64 GPUs, as two
 separate single-arch builds by generation:
 
-- **RTX 40** (Ada Lovelace, SM 89) — RTX 4080, RTX 4090 — `build_rtx40.sh`
-- **RTX 50** (Blackwell, SM 120) — RTX 5080, RTX 5090 — `build_rtx50.sh`
+- **RTX 40** (Ada Lovelace, SM 89) — RTX 4080, RTX 4090 — `tuned/build.sh rtx40`
+- **RTX 50** (Blackwell, SM 120) — RTX 5080, RTX 5090 — `tuned/build.sh rtx50`
+
+(`build_rtx40.sh`/`build_rtx50.sh` at the repo root still work — they're
+deprecation shims that exec the above.)
 
 Each is single-arch, named by GPU codename per
 [WHEEL_NAMING.md](WHEEL_NAMING.md): `libcuvs-rtx40-cu132.so` /
@@ -25,23 +28,23 @@ See [BUILD_gb10.md](BUILD_gb10.md) for the aarch64 / DGX Spark build.
 ## Quick start
 
 ```bash
-bash build_rtx40.sh
+bash tuned/build.sh rtx40
 # produces: cpp/build/libcuvs-rtx40-cu132.so
 
-bash build_rtx50.sh
+bash tuned/build.sh rtx50
 # produces: cpp/build/libcuvs-rtx50-cu132.so
 ```
 
 To target a different CUDA version:
 
 ```bash
-CUDA_VER=13.3 bash build_rtx40.sh
+CUDA_VER=13.3 bash tuned/build.sh rtx40
 # produces: cpp/build/libcuvs-rtx40-cu133.so
 ```
 
 ## CUDA version selection
 
-The CUDA version is a single input shared via `scripts/cuda_env.sh`.
+The CUDA version is a single input shared via `tuned/env.sh`.
 Specify either variable; the other is derived:
 
 | Variable | Example | Derived |
@@ -57,8 +60,8 @@ full version/naming scheme.
 
 | Codename | SM | Target GPUs | Script |
 |----------|----|-------------|--------|
-| rtx40 | 89-real | RTX 4080, RTX 4090 | `build_rtx40.sh` |
-| rtx50 | 120a-real | RTX 5080, RTX 5090 | `build_rtx50.sh` |
+| rtx40 | 89-real | RTX 4080, RTX 4090 | `tuned/build.sh rtx40` |
+| rtx50 | 120a-real | RTX 5080, RTX 5090 | `tuned/build.sh rtx50` |
 
 ## Build output
 
@@ -74,6 +77,7 @@ full version/naming scheme.
 - If `nvcc` reports a different version than `CUDA_VER`, set `CUDA_HOME`.
 
 **Wrong GPU / script mismatch**
-- Each script targets exactly one architecture; there's no combined build.
-  Run `build_rtx40.sh` on Ada hardware, `build_rtx50.sh` on Blackwell
-  hardware, or build both if you need to distribute for both generations.
+- Each variant targets exactly one architecture; there's no combined build.
+  Run `tuned/build.sh rtx40` on Ada hardware, `tuned/build.sh rtx50` on
+  Blackwell hardware, or build both if you need to distribute for both
+  generations.

@@ -22,20 +22,23 @@ See [BUILD_rtx.md](BUILD_rtx.md) for the RTX 40 / RTX 50 (x86_64) builds.
 ## Quick start
 
 ```bash
-bash build_gb10.sh
+bash tuned/build.sh gb10
 # produces: cpp/build/libcuvs-gb10-cu132.so
 ```
+
+(`build_gb10.sh` at the repo root still works — it's a deprecation shim that
+execs `tuned/build.sh gb10`.)
 
 To target a different CUDA version:
 
 ```bash
-CUDA_VER=13.3 bash build_gb10.sh
+CUDA_VER=13.3 bash tuned/build.sh gb10
 # produces: cpp/build/libcuvs-gb10-cu133.so
 ```
 
 ## CUDA version selection
 
-The CUDA version is a single input shared via `scripts/cuda_env.sh`.
+The CUDA version is a single input shared via `tuned/env.sh`.
 Specify either variable; the other is derived:
 
 | Variable | Example | Derived |
@@ -65,10 +68,10 @@ Blackwell family-specific SASS variant.
   matching toolkit.
 
 **Build runs out of memory**
-- Reduce parallelism: `PARALLEL_LEVEL=4 bash build_gb10.sh`
+- Reduce parallelism: `PARALLEL_LEVEL=4 bash tuned/build.sh gb10`
 
 ## Note for faiss consumers
 
 `zbrad/faiss gpu-cu/scripts/build_lib_gb10.sh` expects
 `libcuvs-gb10-${FAISS_CUDA_TAG}.so` from `${CUVS_DIR}` and suggests
-`./build_gb10.sh` in its error messages.
+`tuned/build.sh gb10` in its error messages.

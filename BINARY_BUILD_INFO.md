@@ -20,14 +20,17 @@ targets owned/verified consumer + DGX Spark hardware. See
 
 | Library | Platform | Target | SM | Build script |
 |---------|----------|--------|----|--------------|
-| `libcuvs-rtx40-cu132.so` | x86_64 | RTX 4080, RTX 4090 (Ada Lovelace) | 89 | `build_rtx40.sh` |
-| `libcuvs-rtx50-cu132.so` | x86_64 | RTX 5080, RTX 5090 (Blackwell) | 120 | `build_rtx50.sh` |
-| `libcuvs-gb10-cu132.so` | aarch64 | DGX Spark — GB10 Grace Blackwell | 121 | `build_gb10.sh` |
+| `libcuvs-rtx40-cu132.so` | x86_64 | RTX 4080, RTX 4090 (Ada Lovelace) | 89 | `tuned/build.sh rtx40` |
+| `libcuvs-rtx50-cu132.so` | x86_64 | RTX 5080, RTX 5090 (Blackwell) | 120 | `tuned/build.sh rtx50` |
+| `libcuvs-gb10-cu132.so` | aarch64 | DGX Spark — GB10 Grace Blackwell | 121 | `tuned/build.sh gb10` |
+
+Root-level `build_gb10.sh`/`build_rtx40.sh`/`build_rtx50.sh` are deprecation
+shims that exec the above; see "Deprecated script names" below.
 
 **Naming rules:**
 - GPU codename (`gb10` / `rtx40` / `rtx50`) is in the library filename; CPU
   arch and SM number are not, since each codename implies exactly one of each.
-- CUDA version (`cu132`) is derived from the single knob in `scripts/cuda_env.sh`.
+- CUDA version (`cu132`) is derived from the single knob in `tuned/env.sh`.
 - Every build here is single-arch, compiled `-real` (native SASS, no PTX/JIT
   fallback).
 - The build directory (`cpp/build/`) is version-agnostic; no CUDA version in the path.
@@ -102,7 +105,7 @@ via `torch` `device_capability` on real hardware), distributed as a
 
 Built with:
 ```
-bash build_gb10.sh
+bash tuned/build.sh gb10
   # CUDA_VER=13.2, CUDA_ARCHS="121a-real" (single-arch, Blackwell family-specific)
   # -DCUVS_OUTPUT_NAME=cuvs-gb10-cu132
   # Output: cpp/build/libcuvs-gb10-cu132.so
@@ -118,7 +121,10 @@ Key DGX Spark characteristics:
 
 | Old script | New script | Note |
 |------------|------------|------|
-| `build_dgx_spark.sh` | `build_gb10.sh` | Shim retained for backward compat |
-| `build_ada_blackwell.sh` | `build_rtx40.sh` / `build_rtx50.sh` | **Removed, not shimmed** — the old fat binary split into two generations; errors with guidance instead of guessing which one you want |
-| `build_aarch64.sh` (never released) | `build_gb10.sh` | Superseded before shipping |
-| `build_x86_64.sh` (never released) | `build_rtx40.sh` / `build_rtx50.sh` | Superseded before shipping |
+| `build_dgx_spark.sh` | `tuned/build.sh gb10` | Shim retained for backward compat |
+| `build_gb10.sh` | `tuned/build.sh gb10` | Shim retained for backward compat (consolidated into tuned/build.sh alongside rtx40/rtx50) |
+| `build_rtx40.sh` | `tuned/build.sh rtx40` | Shim retained for backward compat |
+| `build_rtx50.sh` | `tuned/build.sh rtx50` | Shim retained for backward compat |
+| `build_ada_blackwell.sh` | `tuned/build.sh rtx40` / `tuned/build.sh rtx50` | **Removed, not shimmed** — the old fat binary split into two generations; errors with guidance instead of guessing which one you want |
+| `build_aarch64.sh` (never released) | `tuned/build.sh gb10` | Superseded before shipping |
+| `build_x86_64.sh` (never released) | `tuned/build.sh rtx40` / `tuned/build.sh rtx50` | Superseded before shipping |

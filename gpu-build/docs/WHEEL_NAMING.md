@@ -17,7 +17,7 @@ switched to the vLLM-style codename convention on 2026-07-06.
 
 ## Guiding principles
 
-1. **Single CUDA-version knob** — one sourced env file (`scripts/cuda_env.sh`)
+1. **Single CUDA-version knob** — one sourced env file (`tuned/env.sh`)
    defines `CUDA_VER` (e.g. `13.2`) and `CUDA_TAG` (e.g. `cu132`). Specify
    either at build time; the other is derived. Changing the CUDA version needs
    no script or path renames.
@@ -44,8 +44,11 @@ switched to the vLLM-style codename convention on 2026-07-06.
    claimed to support. Building only what's actually been run on real
    hardware avoids repeating that mistake.
 
-5. **Build scripts named by GPU codename** — `build_gb10.sh` / `build_rtx40.sh`
-   / `build_rtx50.sh`.
+5. **One consolidated build script, parameterized by GPU codename** —
+   `tuned/build.sh gb10` / `tuned/build.sh rtx40` / `tuned/build.sh rtx50`,
+   driven by `tuned/devices/<codename>.conf`. (The three previously-separate
+   scripts were ~90% identical; root-level `build_gb10.sh`/`build_rtx40.sh`/
+   `build_rtx50.sh` remain as deprecation shims for existing automation.)
 
 ---
 
@@ -53,11 +56,11 @@ switched to the vLLM-style codename convention on 2026-07-06.
 
 | Build | Script | CPU arch | CUDA_ARCHS | Output library |
 |-------|--------|----------|------------|-----------------|
-| RTX 40 / Ada Lovelace | `build_rtx40.sh` | x86_64 | `89-real` | `libcuvs-rtx40-cu132.so` |
-| RTX 50 / Blackwell | `build_rtx50.sh` | x86_64 | `120a-real` | `libcuvs-rtx50-cu132.so` |
-| GB10 / DGX Spark | `build_gb10.sh` | aarch64 | `121a-real` | `libcuvs-gb10-cu132.so` |
+| RTX 40 / Ada Lovelace | `tuned/build.sh rtx40` | x86_64 | `89-real` | `libcuvs-rtx40-cu132.so` |
+| RTX 50 / Blackwell | `tuned/build.sh rtx50` | x86_64 | `120a-real` | `libcuvs-rtx50-cu132.so` |
+| GB10 / DGX Spark | `tuned/build.sh gb10` | aarch64 | `121a-real` | `libcuvs-gb10-cu132.so` |
 
-The `cu132` portion tracks `CUDA_TAG`; bump `CUDA_VER` in `scripts/cuda_env.sh`
+The `cu132` portion tracks `CUDA_TAG`; bump `CUDA_VER` in `tuned/env.sh`
 (or pass it at the command line) and all names update automatically.
 
 ---
@@ -68,19 +71,19 @@ Specify it **per build** — no file edits needed:
 
 ```bash
 # GB10 / DGX Spark, CUDA 13.3 → libcuvs-gb10-cu133.so
-CUDA_VER=13.3 bash build_gb10.sh
+CUDA_VER=13.3 bash tuned/build.sh gb10
 
 # RTX 40, CUDA 13.3 → libcuvs-rtx40-cu133.so
-CUDA_VER=13.3 bash build_rtx40.sh
+CUDA_VER=13.3 bash tuned/build.sh rtx40
 
 # RTX 50, CUDA 13.3 → libcuvs-rtx50-cu133.so
-CUDA_VER=13.3 bash build_rtx50.sh
+CUDA_VER=13.3 bash tuned/build.sh rtx50
 
 # Tag form (equivalent)
-CUDA_TAG=cu133 bash build_gb10.sh
+CUDA_TAG=cu133 bash tuned/build.sh gb10
 ```
 
-To change the **default**, edit `CUDA_VER` in `scripts/cuda_env.sh`.
+To change the **default**, edit `CUDA_VER` in `tuned/env.sh`.
 
 **Multi-toolkit hosts.** When `CUDA_HOME` is not set, `cuda_env.sh` resolves it
 to `/usr/local/cuda-<CUDA_VER>` if that directory exists (falling back to
