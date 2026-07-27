@@ -14,7 +14,7 @@ established on that repo's `gb10` branch, since renamed). Datacenter/professiona
 architectures (Hopper, Blackwell DC, GB200, and Ada professional parts like
 L40/L40S/RTX 6000 Ada) are intentionally **not** built here — this repo only
 targets owned/verified consumer + DGX Spark hardware. See
-`gpu-build/docs/WHEEL_NAMING.md` for the full rationale and naming rules.
+`tuned/docs/WHEEL_NAMING.md` for the full rationale and naming rules.
 
 ### Library Binaries
 
@@ -24,8 +24,11 @@ targets owned/verified consumer + DGX Spark hardware. See
 | `libcuvs-rtx50-cu132.so` | x86_64 | RTX 5080, RTX 5090 (Blackwell) | 120 | `tuned/build.sh rtx50` |
 | `libcuvs-gb10-cu132.so` | aarch64 | DGX Spark — GB10 Grace Blackwell | 121 | `tuned/build.sh gb10` |
 
-Root-level `build_gb10.sh`/`build_rtx40.sh`/`build_rtx50.sh` are deprecation
-shims that exec the above; see "Deprecated script names" below.
+The old root-level `build_gb10.sh`/`build_rtx40.sh`/`build_rtx50.sh` scripts
+(and the `build_dgx_spark.sh`/`build_ada_blackwell.sh` shims that pointed at
+predecessors of those) have been removed entirely -- no compat shims are
+kept at root; see "Deprecated script names" below for the old-name -> new
+mapping.
 
 **Naming rules:**
 - GPU codename (`gb10` / `rtx40` / `rtx50`) is in the library filename; CPU
@@ -119,12 +122,12 @@ Key DGX Spark characteristics:
 
 ### Deprecated script names
 
-| Old script | New script | Note |
-|------------|------------|------|
-| `build_dgx_spark.sh` | `tuned/build.sh gb10` | Shim retained for backward compat |
-| `build_gb10.sh` | `tuned/build.sh gb10` | Shim retained for backward compat (consolidated into tuned/build.sh alongside rtx40/rtx50) |
-| `build_rtx40.sh` | `tuned/build.sh rtx40` | Shim retained for backward compat |
-| `build_rtx50.sh` | `tuned/build.sh rtx50` | Shim retained for backward compat |
-| `build_ada_blackwell.sh` | `tuned/build.sh rtx40` / `tuned/build.sh rtx50` | **Removed, not shimmed** — the old fat binary split into two generations; errors with guidance instead of guessing which one you want |
+| Old script | New invocation | Note |
+|------------|----------------|------|
+| `build_dgx_spark.sh` | `tuned/build.sh gb10` | Removed entirely, no shim |
+| `build_gb10.sh` | `tuned/build.sh gb10` | Removed entirely, no shim (consolidated into tuned/build.sh alongside rtx40/rtx50) |
+| `build_rtx40.sh` | `tuned/build.sh rtx40` | Removed entirely, no shim |
+| `build_rtx50.sh` | `tuned/build.sh rtx50` | Removed entirely, no shim |
+| `build_ada_blackwell.sh` | `tuned/build.sh rtx40` / `tuned/build.sh rtx50` | Removed entirely — the old fat binary split into two generations, no single correct redirect target |
 | `build_aarch64.sh` (never released) | `tuned/build.sh gb10` | Superseded before shipping |
 | `build_x86_64.sh` (never released) | `tuned/build.sh rtx40` / `tuned/build.sh rtx50` | Superseded before shipping |

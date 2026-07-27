@@ -6,9 +6,6 @@ separate single-arch builds by generation:
 - **RTX 40** (Ada Lovelace, SM 89) — RTX 4080, RTX 4090 — `tuned/build.sh rtx40`
 - **RTX 50** (Blackwell, SM 120) — RTX 5080, RTX 5090 — `tuned/build.sh rtx50`
 
-(`build_rtx40.sh`/`build_rtx50.sh` at the repo root still work — they're
-deprecation shims that exec the above.)
-
 Each is single-arch, named by GPU codename per
 [WHEEL_NAMING.md](WHEEL_NAMING.md): `libcuvs-rtx40-cu132.so` /
 `libcuvs-rtx50-cu132.so`. Datacenter/professional architectures (Hopper,

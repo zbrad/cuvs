@@ -26,9 +26,6 @@ bash tuned/build.sh gb10
 # produces: cpp/build/libcuvs-gb10-cu132.so
 ```
 
-(`build_gb10.sh` at the repo root still works — it's a deprecation shim that
-execs `tuned/build.sh gb10`.)
-
 To target a different CUDA version:
 
 ```bash

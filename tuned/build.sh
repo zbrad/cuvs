@@ -5,15 +5,15 @@
 
 # tuned/build.sh <variant> — build cuVS's C++ shared library for a single
 # GPU variant (gb10/rtx40/rtx50), single-arch, named by GPU codename per
-# gpu-build/docs/WHEEL_NAMING.md:
+# tuned/docs/WHEEL_NAMING.md:
 #   libcuvs-<variant>-cu<tag>.so
 #
-# Consolidates what used to be three ~90%-identical scripts
-# (build_gb10.sh, build_rtx40.sh, build_rtx50.sh) into one, parameterized by
-# tuned/devices/<variant>.conf. The old root-level scripts are now thin
-# deprecation shims that exec this with the matching variant baked in --
-# same pattern this repo already uses for build_dgx_spark.sh/
-# build_ada_blackwell.sh (see BINARY_BUILD_INFO.md).
+# Consolidates what used to be three ~90%-identical root-level scripts
+# (build_gb10.sh, build_rtx40.sh, build_rtx50.sh, plus the build_dgx_spark.sh/
+# build_ada_blackwell.sh compat shims that pointed at them) into one,
+# parameterized by tuned/devices/<variant>.conf. All of that non-upstream
+# tooling now lives under tuned/ -- see tuned/docs/BINARY_BUILD_INFO.md's
+# "Deprecated script names" table for the old-name -> new-invocation mapping.
 #
 # Usage:
 #   bash tuned/build.sh gb10
