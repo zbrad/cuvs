@@ -192,6 +192,11 @@ embed_build_info() {
     local tmp
     tmp="$(mktemp)"
     echo "cuvs-${variant} build: ${package} v${version}, https://github.com/zbrad/cuvs, built $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${tmp}"
+    # Idempotent: objcopy --add-section on a section name that already
+    # exists (e.g. re-packaging the same install tree a second time)
+    # empirically corrupts its own in-place rewrite ("file format not
+    # recognized" on its own temp output) -- strip any prior stamp first.
+    objcopy --remove-section .cuvs_build_info "${so_path}" 2>/dev/null || true
     objcopy --add-section .cuvs_build_info="${tmp}" "${so_path}"
     rm -f "${tmp}"
 }

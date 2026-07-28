@@ -139,6 +139,35 @@ cuvs_check_raft_version "${LIBCUVS_BUILD_DIR}" "${REPODIR}"
 
 cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c install
 
+# cuvs-config.cmake (installed above) exports cuvs::cuvs with a link
+# interface that references raft::raft and rmm::rmm as real CMake
+# targets -- RAPIDS' standard assumption is that any consumer already has
+# a full conda/RAPIDS environment where those are independently
+# installed. Since this tuned build targets a plain venv (no conda), and
+# the whole point of publishing a tarball (tuned/package.sh) is a
+# self-contained C++ SDK a downstream consumer (zbrad/faiss) can use
+# without one, also install raft/rmm's own CPM-fetched build trees into
+# the SAME install prefix. Confirmed empirically: cuvs never installs
+# these itself (this repo's own INSTALL_PREFIX had zero raft/rmm content
+# before this was added -- find_package(cuvs) elsewhere failed outright
+# with "target rmm::rmm not found"). rmm-build/raft-build are CPM
+# subdirectory builds folded into cuvs's single top-level CMakeCache (no
+# CMakeCache.txt of their own), so `cmake --install <dir>` (which expects
+# one) doesn't apply -- but their generated cmake_install.cmake scripts
+# are fully self-contained and installable directly via `cmake -P`.
+for _dep in rmm raft; do
+    _dep_install_script="${LIBCUVS_BUILD_DIR}/_deps/${_dep}-build/cmake_install.cmake"
+    if [[ -f "${_dep_install_script}" ]]; then
+        echo "Installing CPM-fetched ${_dep} (cuvs::cuvs's link interface requires it)..."
+        cmake -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -P "${_dep_install_script}"
+    else
+        echo "ERROR: ${_dep_install_script} not found -- cuvs::cuvs will be unusable by any" >&2
+        echo "  external CMake consumer (missing link-interface target ${_dep}::${_dep})." >&2
+        exit 1
+    fi
+done
+unset _dep _dep_install_script
+
 # Verify output
 LIBDIR="${REPODIR}/cpp/build"
 EXPECTED_LIB="${LIBDIR}/lib${CUVS_LIB_NAME}.so"
