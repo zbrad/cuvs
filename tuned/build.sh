@@ -65,6 +65,51 @@ LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-${REPODIR}/cpp/build}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-${PREFIX:-${CONDA_PREFIX:-${LIBCUVS_BUILD_DIR}/install}}}"
 PARALLEL_LEVEL="${PARALLEL_LEVEL:-$(nproc)}"
 
+# Use ccache as the compiler launcher when available -- a cold cache gets
+# no benefit (this build's own header-heavy CUTLASS/raft templates make a
+# first compile inherently slow), but every subsequent rebuild against the
+# same sources (iterating on this repo, or rebuilding after a clean) hits
+# the cache instead of recompiling from scratch. No-op, not an error, when
+# ccache isn't installed.
+CMAKE_LAUNCHER_ARGS=()
+if command -v ccache >/dev/null 2>&1; then
+    echo "ccache found -- using as compiler launcher (CCACHE_DIR=${CCACHE_DIR:-\$HOME/.cache/ccache})"
+    CMAKE_LAUNCHER_ARGS=(
+        -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache
+        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    )
+fi
+
+# BUILD_MG_ALGOS=ON (rtx40/rtx50, see tuned/devices/<variant>.conf) makes
+# cpp/CMakeLists.txt's find_package(NCCL REQUIRED) unconditional. The pip
+# nvidia-nccl-cu13 wheel only ships a versioned libnccl.so.2 -- no
+# unversioned libnccl.so symlink FindNCCL.cmake's default find_library()
+# name search expects -- so point NCCL_LIBRARY/NCCL_INCLUDE_DIR at the
+# exact wheel paths directly, same fix zbrad/raft's tuned/wheel.sh already
+# needed for the same reason (see that file's NCCL section). gb10 has
+# BUILD_MG_ALGOS=OFF, so find_package(NCCL) never runs there -- no NCCL
+# wiring needed.
+NCCL_CMAKE_ARGS=()
+if [[ "${GPU_TUNED_BUILD_MG_ALGOS}" == "ON" ]]; then
+    NCCL_PY_PREFIX="$(python3 -c 'import nvidia.nccl as m; print(list(m.__path__)[0])' 2>/dev/null)" || true
+    if [[ -z "${NCCL_PY_PREFIX}" ]]; then
+        echo "ERROR: BUILD_MG_ALGOS=ON requires NCCL, but 'python3 -c import nvidia.nccl'" >&2
+        echo "  failed. Install it: pip install nvidia-nccl-cu13" >&2
+        exit 1
+    fi
+    NCCL_LIB="$(ls "${NCCL_PY_PREFIX}"/lib/libnccl.so* 2>/dev/null | head -1)"
+    if [[ -z "${NCCL_LIB}" ]]; then
+        echo "ERROR: no libnccl.so* found under ${NCCL_PY_PREFIX}/lib" >&2
+        exit 1
+    fi
+    echo "NCCL found via nvidia-nccl-cu13: ${NCCL_LIB}"
+    NCCL_CMAKE_ARGS=(
+        -DNCCL_LIBRARY="${NCCL_LIB}"
+        -DNCCL_INCLUDE_DIR="${NCCL_PY_PREFIX}/include"
+    )
+fi
+
 mkdir -p "${LIBCUVS_BUILD_DIR}"
 
 cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
@@ -82,7 +127,9 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   -DBUILD_CPU_ONLY=OFF \
   -DBUILD_MG_ALGOS="${GPU_TUNED_BUILD_MG_ALGOS}" \
   -DBUILD_SHARED_LIBS=ON \
-  "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}"
+  "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}" \
+  "${CMAKE_LAUNCHER_ARGS[@]}" \
+  "${NCCL_CMAKE_ARGS[@]}"
 
 # Surface which raft this configure actually fetched (this repo tracks
 # upstream raft's main branch, not a pinned release, so version drift here

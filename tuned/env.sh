@@ -231,8 +231,11 @@ cuvs_check_raft_version() {
     fi
 
     local raft_version cuvs_version raft_mm cuvs_mm
-    raft_version="$(cat "$raft_version_file")"
-    cuvs_version="$(cat "${repodir}/VERSION")"
+    # tr -d '\r': defends against CRLF drift (bash's $() strips a trailing
+    # \n but not \r) -- see tuned/package.sh's identical note for the real
+    # failure mode this empirically caused.
+    raft_version="$(tr -d '\r' < "$raft_version_file")"
+    cuvs_version="$(tr -d '\r' < "${repodir}/VERSION")"
     raft_mm="$(echo "$raft_version" | grep -oE '^[0-9]+\.[0-9]+')"
     cuvs_mm="$(echo "$cuvs_version" | grep -oE '^[0-9]+\.[0-9]+')"
 

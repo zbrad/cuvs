@@ -28,7 +28,13 @@ GPU_TUNED_ARG_VARIANT="$1"
 source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
 
 CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"
-CUVS_VERSION="$(cat "${REPODIR}/VERSION")"
+# tr -d '\r': defends against CRLF drift in VERSION (bash's $() only
+# strips a trailing \n, not \r) -- a real, empirically-hit failure mode:
+# an embedded \r here silently corrupted both the release tag_name (gh
+# rejected it as "not well-formed") and the tarball filename (a hidden \r
+# byte made ls/find LOOK like a normal name on screen while stat/gh/cp all
+# correctly reported "no such file" for the literal name being typed).
+CUVS_VERSION="$(tr -d '\r' < "${REPODIR}/VERSION")"
 
 # Must match tuned/build.sh's own default resolution exactly -- this script
 # does not rebuild, it packages whatever tuned/build.sh already installed.
