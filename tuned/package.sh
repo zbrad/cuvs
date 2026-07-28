@@ -51,7 +51,9 @@ if [[ ! -f "${INSTALLED_LIB}" ]]; then
     echo "  INSTALL_PREFIX/PREFIX/CONDA_PREFIX this script resolved above)." >&2
     exit 1
 fi
-gpu_tuned_verify_arch "${INSTALLED_LIB}"
+gpu_tuned_verify_arch "${INSTALLED_LIB}" || exit 1
+gpu_tuned_verify_cuda_compat "${INSTALLED_LIB}" "${CUDA_VER}" || exit 1
+embed_build_info "${INSTALLED_LIB}" "${GPU_TUNED_VARIANT}" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}"
 
 CUVS_CMAKE_CONFIG="$(find "${INSTALL_PREFIX}" -maxdepth 4 -iname 'cuvs-config.cmake' 2>/dev/null | head -1)"
 if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then

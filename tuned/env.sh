@@ -143,6 +143,59 @@ gpu_tuned_verify_arch() {
     echo "OK: ${so_file} confirmed single-arch ${found} (matches requested sm_${GPU_TUNED_CUDA_ARCH})"
 }
 
+# gpu_tuned_verify_cuda_compat <path-to-.so> <expected-cuda-ver> — confirms
+# a compiled library's NEEDED libcudart.so.<major> matches the CUDA major
+# version this build expects. CUDA's runtime ABI is only guaranteed
+# forward-compatible WITHIN a major series (e.g. built against 13.2 but
+# running against 13.3 is fine; 12.x vs 13.x is not) -- so this checks
+# major only, by design. Complements gpu_tuned_verify_arch (SM arch) with
+# the orthogonal CUDA-runtime-version axis. Same name/signature as
+# zbrad/faiss's tuned/env.sh equivalent, which also calls this on a
+# downloaded cuvs release .so before linking against it.
+gpu_tuned_verify_cuda_compat() {
+    local so_file="$1" expected_cuda_ver="$2"
+    if [[ ! -f "${so_file}" ]]; then
+        echo "ERROR: gpu_tuned_verify_cuda_compat: no such file: ${so_file}" >&2
+        return 1
+    fi
+    command -v objdump >/dev/null 2>&1 || {
+        echo "ERROR: gpu_tuned_verify_cuda_compat: objdump not found on PATH." >&2
+        return 1
+    }
+    local needed found_major expected_major
+    needed="$(objdump -p "${so_file}" 2>/dev/null | grep -oE 'libcudart\.so\.[0-9]+' | head -1)"
+    if [[ -z "${needed}" ]]; then
+        echo "WARNING: ${so_file} has no direct libcudart.so.N NEEDED entry -- skipping CUDA runtime compat check." >&2
+        return 0
+    fi
+    found_major="${needed##*.}"
+    expected_major="${expected_cuda_ver%%.*}"
+    if [[ "${found_major}" != "${expected_major}" ]]; then
+        echo "ERROR: ${so_file} was linked against CUDA runtime major ${found_major}" \
+             "(${needed}), but this build expects CUDA ${expected_cuda_ver}" \
+             "(major ${expected_major}). CUDA's runtime ABI is only forward-compatible" \
+             "within the same major version." >&2
+        return 1
+    fi
+    echo "OK: ${so_file} CUDA runtime compat confirmed (${needed}, matches expected major ${expected_major})"
+}
+
+# embed_build_info <so_path> <variant> <package> <version> — embeds a
+# greppable build-info string into a custom ELF section (.cuvs_build_info)
+# on the given .so, readable later via `readelf -p .cuvs_build_info <so>`
+# or plain `strings`. Safe at runtime: a custom section with no
+# program-header entry is simply ignored by the dynamic loader. Same
+# technique/name as zbrad/raft's tuned/raft_wheel_common.sh equivalent
+# (.raft_build_info).
+embed_build_info() {
+    local so_path="$1" variant="$2" package="$3" version="$4"
+    local tmp
+    tmp="$(mktemp)"
+    echo "cuvs-${variant} build: ${package} v${version}, https://github.com/zbrad/cuvs, built $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${tmp}"
+    objcopy --add-section .cuvs_build_info="${tmp}" "${so_path}"
+    rm -f "${tmp}"
+}
+
 # cuvs_check_raft_version <libcuvs_build_dir> <cuvs_repodir> — surfaces which
 # raft this build actually linked against.
 #
