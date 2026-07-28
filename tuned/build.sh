@@ -150,11 +150,27 @@ cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c 
 # the SAME install prefix. Confirmed empirically: cuvs never installs
 # these itself (this repo's own INSTALL_PREFIX had zero raft/rmm content
 # before this was added -- find_package(cuvs) elsewhere failed outright
-# with "target rmm::rmm not found"). rmm-build/raft-build are CPM
-# subdirectory builds folded into cuvs's single top-level CMakeCache (no
-# CMakeCache.txt of their own), so `cmake --install <dir>` (which expects
-# one) doesn't apply -- but their generated cmake_install.cmake scripts
-# are fully self-contained and installable directly via `cmake -P`.
+# with "target rmm::rmm not found").
+#
+# CCCL (CUB/Thrust/libcudacxx) is NOT included in this loop -- its
+# CPM-fetched build tree (_deps/cccl-build/) has zero install() rules of
+# its own (confirmed: rapids-cmake fetches it purely for header-only
+# in-build usage, install rules disabled as a subproject), so there's
+# nothing to vendor via this cmake -P technique. Consumers instead rely
+# on their OWN CUDA toolkit's bundled CCCL satisfying whatever minimum
+# version raft/rmm's exported dependencies declare (empirically: CUDA
+# 13.3 ships CCCL 3.3.3, which satisfies it; CUDA 13.2 ships only 3.2.0,
+# which does not) -- see zbrad/faiss tuned/build.sh's CCCL_DIR pin and
+# gpu_tuned_verify_cccl_toolkit_match for how that's enforced on the
+# consumer side, rather than silently falling through to whatever CMake's
+# broader system search happens to find (which, on a WSL host with
+# Windows PATH interop, can be a completely different OS's CUDA install).
+#
+# rmm-build/raft-build are CPM subdirectory builds folded into cuvs's
+# single top-level CMakeCache (no CMakeCache.txt of their own), so
+# `cmake --install <dir>` (which expects one) doesn't apply -- but their
+# generated cmake_install.cmake scripts are fully self-contained and
+# installable directly via `cmake -P`.
 for _dep in rmm raft; do
     _dep_install_script="${LIBCUVS_BUILD_DIR}/_deps/${_dep}-build/cmake_install.cmake"
     if [[ -f "${_dep_install_script}" ]]; then
