@@ -57,6 +57,18 @@ if [[ "$(uname -m)" != "${GPU_TUNED_PLATFORM}" ]]; then
     return 1 2>/dev/null || exit 1
 fi
 
+# List installed toolkits under /usr/local/cuda-<ver> (glob, sorted). Used
+# both to derive the default CUDA_VER below (highest installed, not a
+# hardcoded version that inevitably goes stale -- e.g. this default was
+# "13.2" even after 13.3 was installed here) and to give actionable
+# guidance instead of a bare "wrong version" warning.
+cuvs_installed_cuda_toolkits() {
+    local d
+    for d in /usr/local/cuda-[0-9]*; do
+        [ -d "$d" ] && basename "$d" | sed 's/^cuda-//'
+    done | sort -V
+}
+
 # --- Resolve CUDA_VER / CUDA_TAG (specify either, derive the other) ---
 if [ -n "${CUDA_VER:-}" ]; then
     : "${CUDA_TAG:=cu${CUDA_VER//./}}"                          # 13.3 -> cu133
@@ -65,17 +77,13 @@ elif [ -n "${CUDA_TAG:-}" ]; then
     : "${CUDA_VER:=${_cuda_digits%?}.${_cuda_digits: -1}}"     # 133 -> 13.3
     unset _cuda_digits
 fi
-export CUDA_VER="${CUDA_VER:-13.2}"
+if [ -z "${CUDA_VER:-}" ]; then
+    _cuvs_latest="$(cuvs_installed_cuda_toolkits | tail -1)"
+    CUDA_VER="${_cuvs_latest:-13.2}"  # last-resort fallback if nothing is installed yet
+    unset _cuvs_latest
+fi
+export CUDA_VER
 export CUDA_TAG="${CUDA_TAG:-cu${CUDA_VER//./}}"
-
-# List installed toolkits under /usr/local/cuda-<ver> (glob, sorted). Used to
-# give actionable guidance instead of a bare "wrong version" warning.
-cuvs_installed_cuda_toolkits() {
-    local d
-    for d in /usr/local/cuda-[0-9]*; do
-        [ -d "$d" ] && basename "$d" | sed 's/^cuda-//'
-    done | sort -V
-}
 
 # --- Resolve CUDA_HOME to the matching toolkit when not explicitly set ---
 if [ -z "${CUDA_HOME:-}" ]; then
