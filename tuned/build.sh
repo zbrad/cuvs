@@ -28,6 +28,73 @@
 
 set -e
 
+# resolve_raft_release <variant> <cuda_tag> — download + extract the
+# matching zbrad/raft tuned-builds release (see that repo's
+# tuned/package.sh/release.sh) into tuned/_raft_release/<variant>-<cuda_tag>/,
+# unless already present there. Prints the extracted root on stdout via the
+# RAFT_RELEASE_DIR variable set in the caller's scope.
+#
+# Without this, cpp/cmake/thirdparty/get_raft.cmake's rapids_cpm_find(raft)
+# falls through to its default CPM behavior: git-clone rapidsai/raft's main
+# branch and build it from source as part of this build (real version
+# drift, plus a lot of redundant compile time for a library we already
+# publish a matching prebuilt release of). Putting RAFT_RELEASE_DIR on
+# CMAKE_PREFIX_PATH below makes find_package(raft) succeed against our own
+# published build first, so CPM's fallback never triggers -- same pattern
+# zbrad/faiss's tuned/build.sh already uses to consume this repo's own
+# published release (see resolve_cuvs_release there).
+resolve_raft_release() {
+    local variant="$1" cuda_tag="$2"
+    RAFT_RELEASE_DIR="${REPODIR}/tuned/_raft_release/${variant}-${cuda_tag}"
+
+    if [[ -n "$(find "${RAFT_RELEASE_DIR}" -maxdepth 4 -iname 'raft-config.cmake' 2>/dev/null)" ]]; then
+        echo "raft release already extracted: ${RAFT_RELEASE_DIR} (set FORCE_RAFT_DOWNLOAD=1 to re-fetch)"
+        [[ "${FORCE_RAFT_DOWNLOAD:-0}" != "1" ]] && return 0
+    fi
+
+    echo "Looking up zbrad/raft tuned-builds release for ${variant}-${cuda_tag}..."
+    local tag
+    # raft now publishes v<ver>-<variant>-<cuda_tag>, the same order as
+    # this repo's own release tags -- match the same way faiss matches
+    # cuvs's tags. (Was variant-suffix-only, back when raft's tag order
+    # was v<ver>.0-cuda<compact>-<variant>, cuda tag *before* variant --
+    # that's been unified to match cuvs's order now.)
+    tag="$(gh release list --repo zbrad/raft --json tagName -q '.[].tagName' 2>/dev/null \
+        | grep -E -- "-${variant}-${cuda_tag}\$" | head -1)"
+    if [[ -z "${tag}" ]]; then
+        echo "ERROR: no zbrad/raft release found matching '*-${variant}'." >&2
+        echo "  Available releases:" >&2
+        gh release list --repo zbrad/raft --json tagName -q '.[].tagName' 2>/dev/null | sed 's/^/    /' >&2
+        echo "  Build and publish one first: cd \$(dirname "'"'"${REPODIR}"'"'")/raft && bash tuned/build.sh ${variant} && bash tuned/package.sh ${variant} && bash tuned/release.sh ${variant}" >&2
+        exit 1
+    fi
+    echo "Found release: ${tag}"
+
+    rm -rf "${RAFT_RELEASE_DIR}"
+    mkdir -p "${RAFT_RELEASE_DIR}"
+    local dl_dir
+    dl_dir="$(mktemp -d)"
+    gh release download "${tag}" --repo zbrad/raft --pattern '*.tar.bz2' --dir "${dl_dir}"
+    local tarball
+    tarball="$(ls "${dl_dir}"/*.tar.bz2 | head -1)"
+    [[ -z "${tarball}" ]] && { echo "ERROR: release ${tag} has no .tar.bz2 asset." >&2; exit 1; }
+    # --strip-components=1: unlike this repo's own tarball (flat, tar -C
+    # <prefix> -czf ... . in tuned/package.sh here), raft's tuned/package.sh
+    # wraps its tarball's contents in a top-level raft-<ver>-<variant>-
+    # <cuda_tag>/ directory (cp -r install/ /tmp/<PKG_NAME>/, tar'd from
+    # /tmp) -- confirmed empirically: without this flag, lib/cmake/raft/
+    # ends up nested one level too deep for CMAKE_PREFIX_PATH to find.
+    tar -xjf "${tarball}" -C "${RAFT_RELEASE_DIR}" --strip-components=1
+    rm -rf "${dl_dir}"
+
+    if [[ -z "$(find "${RAFT_RELEASE_DIR}" -maxdepth 4 -iname 'raft-config.cmake' 2>/dev/null)" ]]; then
+        echo "ERROR: extracted release ${tag} does not contain lib/cmake/raft/raft-config.cmake" >&2
+        echo "  Contents: $(find "${RAFT_RELEASE_DIR}" -maxdepth 2)" >&2
+        exit 1
+    fi
+    echo "Extracted to: ${RAFT_RELEASE_DIR}"
+}
+
 REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GPU_TUNED_ARG_VARIANT="$1"
 
@@ -36,6 +103,8 @@ source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
 
 CUDA_ARCHS="${GPU_TUNED_CUDA_ARCH}-real"
 CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"  # e.g. cuvs-rtx50-cu132
+
+resolve_raft_release "${GPU_TUNED_VARIANT}" "${CUDA_TAG}"
 
 echo "===================================================="
 echo "cuVS ${GPU_TUNED_DEVICE_LABEL} Build"
@@ -128,13 +197,17 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   -DBUILD_MG_ALGOS="${GPU_TUNED_BUILD_MG_ALGOS}" \
   -DBUILD_SHARED_LIBS=ON \
   "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}" \
+  "-DCMAKE_PREFIX_PATH=${RAFT_RELEASE_DIR}" \
   "${CMAKE_LAUNCHER_ARGS[@]}" \
   "${NCCL_CMAKE_ARGS[@]}"
 
-# Surface which raft this configure actually fetched (this repo tracks
-# upstream raft's main branch, not a pinned release, so version drift here
-# is expected -- see tuned/env.sh's cuvs_check_raft_version for why this is
-# informational, not a hard gate).
+# Surface which raft this configure actually resolved. As of
+# resolve_raft_release above, this is now zbrad/raft's own published tuned
+# release for this exact variant/cuda_tag (found via CMAKE_PREFIX_PATH),
+# not a CPM git-clone-and-build of upstream rapidsai/raft's main branch --
+# version drift against upstream is still possible (zbrad/raft's own
+# tuned-builds branch isn't pinned to a specific upstream commit either),
+# so this stays informational, not a hard gate.
 cuvs_check_raft_version "${LIBCUVS_BUILD_DIR}" "${REPODIR}"
 
 cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c install
@@ -166,23 +239,41 @@ cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c 
 # broader system search happens to find (which, on a WSL host with
 # Windows PATH interop, can be a completely different OS's CUDA install).
 #
-# rmm-build/raft-build are CPM subdirectory builds folded into cuvs's
-# single top-level CMakeCache (no CMakeCache.txt of their own), so
-# `cmake --install <dir>` (which expects one) doesn't apply -- but their
-# generated cmake_install.cmake scripts are fully self-contained and
-# installable directly via `cmake -P`.
-for _dep in rmm raft; do
-    _dep_install_script="${LIBCUVS_BUILD_DIR}/_deps/${_dep}-build/cmake_install.cmake"
-    if [[ -f "${_dep_install_script}" ]]; then
-        echo "Installing CPM-fetched ${_dep} (cuvs::cuvs's link interface requires it)..."
-        cmake -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -P "${_dep_install_script}"
-    else
-        echo "ERROR: ${_dep_install_script} not found -- cuvs::cuvs will be unusable by any" >&2
-        echo "  external CMake consumer (missing link-interface target ${_dep}::${_dep})." >&2
-        exit 1
-    fi
-done
-unset _dep _dep_install_script
+# rmm-build/raft-build used to be CPM subdirectory builds folded into
+# cuvs's single top-level CMakeCache (no CMakeCache.txt of their own), so
+# `cmake --install <dir>` (which expects one) didn't apply -- but their
+# generated cmake_install.cmake scripts were fully self-contained and
+# installable directly via `cmake -P`. That's no longer how raft (and its
+# own bundled rmm/rapids_logger) gets resolved here at all: resolve_raft_release
+# above makes find_package(raft) succeed against zbrad/raft's own published
+# release (via CMAKE_PREFIX_PATH), so raft/rmm are never CPM-built as
+# subprojects of this build -- there is no _deps/{raft,rmm}-build/ to
+# install from any more. Vendor RAFT_RELEASE_DIR's own already-built
+# content into cuvs's INSTALL_PREFIX directly instead (same end goal: a
+# self-contained cuvs release tarball) -- it already contains raft, rmm,
+# and rapids_logger together (see zbrad/raft tuned/package.sh).
+if [[ -n "${RAFT_RELEASE_DIR:-}" && -d "${RAFT_RELEASE_DIR}/lib" ]]; then
+    echo "Vendoring zbrad/raft release content (raft+rmm+rapids_logger) from ${RAFT_RELEASE_DIR} into ${INSTALL_PREFIX}..."
+    mkdir -p "${INSTALL_PREFIX}"
+    cp -rn "${RAFT_RELEASE_DIR}/." "${INSTALL_PREFIX}/"
+else
+    # Fallback for any consumer of this script that didn't go through
+    # resolve_raft_release (e.g. a plain, non-tuned invocation where CPM
+    # really did clone+build raft/rmm from source as subprojects) -- keep
+    # the old cmake -P vendoring path alive for that case.
+    for _dep in rmm raft; do
+        _dep_install_script="${LIBCUVS_BUILD_DIR}/_deps/${_dep}-build/cmake_install.cmake"
+        if [[ -f "${_dep_install_script}" ]]; then
+            echo "Installing CPM-fetched ${_dep} (cuvs::cuvs's link interface requires it)..."
+            cmake -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -P "${_dep_install_script}"
+        else
+            echo "ERROR: ${_dep_install_script} not found -- cuvs::cuvs will be unusable by any" >&2
+            echo "  external CMake consumer (missing link-interface target ${_dep}::${_dep})." >&2
+            exit 1
+        fi
+    done
+    unset _dep _dep_install_script
+fi
 
 # Verify output
 LIBDIR="${REPODIR}/cpp/build"

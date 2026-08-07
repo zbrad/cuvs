@@ -35,6 +35,12 @@ CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"
 # byte made ls/find LOOK like a normal name on screen while stat/gh/cp all
 # correctly reported "no such file" for the literal name being typed).
 CUVS_VERSION="$(tr -d '\r' < "${REPODIR}/VERSION")"
+# Derive short version (e.g. 26.08.00 -> 26.8), matching zbrad/raft's own
+# tuned/package.sh convention -- used for the tarball name/release tag/
+# title below; CUVS_VERSION (full, unshortened) stays in the build-info
+# stamp and the informational "Version:" line above, where precision
+# matters more than brevity.
+SHORT_VER="$(echo "${CUVS_VERSION}" | sed -E 's/^0*([0-9]+)\.0*([0-9]+)\..*/\1.\2/')"
 
 # Must match tuned/build.sh's own default resolution exactly -- this script
 # does not rebuild, it packages whatever tuned/build.sh already installed.
@@ -73,15 +79,15 @@ echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
 DIST_DIR="${REPODIR}/dist/${GPU_TUNED_VARIANT}"
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
-TARBALL="${DIST_DIR}/libcuvs-${GPU_TUNED_VARIANT}-${CUVS_VERSION}-${CUDA_TAG}.tar.gz"
+TARBALL="${DIST_DIR}/libcuvs-${GPU_TUNED_VARIANT}-${SHORT_VER}-${CUDA_TAG}.tar.gz"
 
 echo ""
 echo "Packaging ${INSTALL_PREFIX} -> ${TARBALL}..."
 tar -C "${INSTALL_PREFIX}" -czf "${TARBALL}" .
 echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}'))"
 
-RELEASE_TAG="v${CUVS_VERSION}-${GPU_TUNED_VARIANT}-${CUDA_TAG}"
-RELEASE_TITLE="cuVS ${CUVS_VERSION} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
+RELEASE_TAG="v${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}"
+RELEASE_TITLE="cuVS ${SHORT_VER} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
 
 echo ""
 echo "Publishing to GitHub release ${RELEASE_TAG}..."
@@ -89,7 +95,7 @@ gh release create "${RELEASE_TAG}" \
     --repo zbrad/cuvs \
     --title "${RELEASE_TITLE}" \
     --target "tuned-builds" \
-    --notes "lib${CUVS_LIB_NAME}.so ${CUVS_VERSION} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh)." \
+    --notes "lib${CUVS_LIB_NAME}.so ${SHORT_VER} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh)." \
     "${TARBALL}#$(basename "${TARBALL}")"
 
 echo ""

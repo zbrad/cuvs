@@ -94,3 +94,6 @@ build_*.log
 
 # tarballs
 libcuvs*.tar.gz
+
+# extracted zbrad/raft release (tuned/build.sh's resolve_raft_release cache)
+/tuned/_raft_release/
