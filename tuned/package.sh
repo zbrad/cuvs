@@ -79,7 +79,7 @@ echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
 DIST_DIR="${REPODIR}/dist/${GPU_TUNED_VARIANT}"
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
-TARBALL="${DIST_DIR}/libcuvs-${GPU_TUNED_VARIANT}-${SHORT_VER}-${CUDA_TAG}.tar.gz"
+TARBALL="${DIST_DIR}/libcuvs-${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}.tar.gz"
 
 echo ""
 echo "Packaging ${INSTALL_PREFIX} -> ${TARBALL}..."
