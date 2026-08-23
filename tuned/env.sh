@@ -111,34 +111,16 @@ if command -v nvcc >/dev/null 2>&1; then
     unset _nvcc_ver
 fi
 
-# embed_build_info <so_path> <variant> <package> <version> [hw_label] —
-# embeds a greppable build-info string into a custom ELF section
-# (.cuvs_build_info) on the given .so, readable later via
-# `readelf -p .cuvs_build_info <so>` or plain `strings`. Safe at runtime:
-# a custom section with no program-header entry is simply ignored by the
-# dynamic loader. Same technique/name as zbrad/raft's
-# tuned/raft_wheel_common.sh equivalent (.raft_build_info).
-#
-# hw_label (optional, defaults to the bare variant if omitted) makes the
-# binary self-describing about WHICH hardware it targets, not just its
-# internal codename -- e.g. "RTX 50-series (Blackwell consumer,
-# desktop/laptop, SM 120a)" rather than just "rtx50". Without this, the
-# only human-readable description of scope lived in the GitHub release's
-# own title text, which goes stale independently of the binary (confirmed:
-# this repo's already-published v26.08.00-rtx50-cu133 release still says
-# "RTX 5080, RTX 5090" after tuned/devices/rtx50.conf's label was broadened).
+# embed_build_info now comes from common.sh (gpu_tuned_embed_build_info) --
+# this repo's every call site already passes package="cuvs" (matching
+# every call: package.sh's tuned/package.sh), so the shared function's
+# package-derived section name naturally lands on the same
+# .cuvs_build_info this repo always used, and its message format
+# (`<package>-<variant> build: <package> v<version> (<hw_label>), <repo_url>,
+# built <date>`) is byte-identical to what the old local version produced.
+# Wrap it just to keep call sites unchanged (repo_url baked in here).
 embed_build_info() {
-    local so_path="$1" variant="$2" package="$3" version="$4" hw_label="${5:-${2}}"
-    local tmp
-    tmp="$(mktemp)"
-    echo "cuvs-${variant} build: ${package} v${version} (${hw_label}), https://github.com/zbrad/cuvs, built $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${tmp}"
-    # Idempotent: objcopy --add-section on a section name that already
-    # exists (e.g. re-packaging the same install tree a second time)
-    # empirically corrupts its own in-place rewrite ("file format not
-    # recognized" on its own temp output) -- strip any prior stamp first.
-    objcopy --remove-section .cuvs_build_info "${so_path}" 2>/dev/null || true
-    objcopy --add-section .cuvs_build_info="${tmp}" "${so_path}"
-    rm -f "${tmp}"
+    gpu_tuned_embed_build_info "$1" "$2" "$3" "$4" "$5" "https://github.com/zbrad/cuvs"
 }
 
 # cuvs_check_raft_version <libcuvs_build_dir> <cuvs_repodir> — surfaces which
