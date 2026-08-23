@@ -46,28 +46,23 @@ GPU_TUNED_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${GPU_TUNED_SELF_DIR}/devices/${GPU_TUNED_ARG_VARIANT}.conf" || return 1 2>/dev/null || exit 1
 export GPU_TUNED_VARIANT GPU_TUNED_PLATFORM GPU_TUNED_CUDA_ARCH GPU_TUNED_BUILD_MG_ALGOS GPU_TUNED_HW_LABEL GPU_TUNED_DEVICE_LABEL
 
+# shellcheck source=common.sh
+# Vendored from https://github.com/zbrad/tuned-common (pinned commit --
+# see common.sh's own header/sync instructions to update). Provides
+# gpu_tuned_verify_arch/verify_cuda_compat/assert_platform/
+# installed_cuda_toolkits, shared verbatim across the fleet instead of
+# hand-copied-and-edited per repo. NOT used for embed_build_info here:
+# this repo stamps every package into the SAME .cuvs_build_info section
+# rather than one section per package -- kept local on purpose (same
+# reasoning as zbrad/raft's tuned/env.sh).
+source "${GPU_TUNED_SELF_DIR}/common.sh" || return 1 2>/dev/null || exit 1
+
 # Fail loudly if this script runs on the wrong host, rather than letting a
 # mismatched build silently produce wrong-architecture binaries that only
 # surface as a confusing failure several steps later. (Previously this check
 # only existed for gb10/aarch64 in build_gb10.sh; rtx40/rtx50 had no
 # equivalent x86_64 check at all -- this makes it uniform across all three.)
-if [[ "$(uname -m)" != "${GPU_TUNED_PLATFORM}" ]]; then
-    echo "ERROR: tuned/env.sh: expected platform '${GPU_TUNED_PLATFORM}' for" \
-         "variant '${GPU_TUNED_VARIANT}', but uname -m reports '$(uname -m)'." >&2
-    return 1 2>/dev/null || exit 1
-fi
-
-# List installed toolkits under /usr/local/cuda-<ver> (glob, sorted). Used
-# both to derive the default CUDA_VER below (highest installed, not a
-# hardcoded version that inevitably goes stale -- e.g. this default was
-# "13.2" even after 13.3 was installed here) and to give actionable
-# guidance instead of a bare "wrong version" warning.
-cuvs_installed_cuda_toolkits() {
-    local d
-    for d in /usr/local/cuda-[0-9]*; do
-        [ -d "$d" ] && basename "$d" | sed 's/^cuda-//'
-    done | sort -V
-}
+gpu_tuned_assert_platform "${GPU_TUNED_PLATFORM}" "${GPU_TUNED_VARIANT}" || return 1 2>/dev/null || exit 1
 
 # --- Resolve CUDA_VER / CUDA_TAG (specify either, derive the other) ---
 if [ -n "${CUDA_VER:-}" ]; then
@@ -78,7 +73,7 @@ elif [ -n "${CUDA_TAG:-}" ]; then
     unset _cuda_digits
 fi
 if [ -z "${CUDA_VER:-}" ]; then
-    _cuvs_latest="$(cuvs_installed_cuda_toolkits | tail -1)"
+    _cuvs_latest="$(gpu_tuned_installed_cuda_toolkits | tail -1)"
     CUDA_VER="${_cuvs_latest:-13.2}"  # last-resort fallback if nothing is installed yet
     unset _cuvs_latest
 fi
@@ -91,7 +86,7 @@ if [ -z "${CUDA_HOME:-}" ]; then
         export CUDA_HOME="/usr/local/cuda-${CUDA_VER}"
     else
         echo "[tuned/env] WARNING: /usr/local/cuda-${CUDA_VER} not found; falling back to /usr/local/cuda (whatever version that symlinks to)." >&2
-        _cuvs_installed="$(cuvs_installed_cuda_toolkits | tr '\n' ' ')"
+        _cuvs_installed="$(gpu_tuned_installed_cuda_toolkits | tr '\n' ' ')"
         if [ -n "$_cuvs_installed" ]; then
             echo "[tuned/env]          Installed toolkits: ${_cuvs_installed}. Set CUDA_VER to one of these, or CUDA_HOME to an explicit path." >&2
         else
@@ -109,84 +104,12 @@ if command -v nvcc >/dev/null 2>&1; then
     if [ -n "$_nvcc_ver" ] && [ "$_nvcc_ver" != "$CUDA_VER" ]; then
         echo "[tuned/env] WARNING: nvcc reports CUDA $_nvcc_ver but CUDA_VER=$CUDA_VER" >&2
         echo "[tuned/env]          (CUDA_HOME=$CUDA_HOME). Set CUDA_HOME or CUDA_VER to match." >&2
-        _cuvs_installed="$(cuvs_installed_cuda_toolkits | tr '\n' ' ')"
+        _cuvs_installed="$(gpu_tuned_installed_cuda_toolkits | tr '\n' ' ')"
         [ -n "$_cuvs_installed" ] && echo "[tuned/env]          Installed toolkits: ${_cuvs_installed}" >&2
         unset _cuvs_installed
     fi
     unset _nvcc_ver
 fi
-
-# gpu_tuned_verify_arch <path-to-.so> — empirical "did the build actually do
-# what we asked" check: confirms a compiled library's embedded cubin(s) are
-# EXACTLY sm_${GPU_TUNED_CUDA_ARCH}, via cuobjdump, catching either a fat
-# multi-arch build or CMake/nvcc silently normalizing to a different arch --
-# neither of which a bare file-existence check (this repo's only prior
-# verification) can detect. Same name/signature as zbrad/raft's tuned/env.sh
-# equivalent.
-gpu_tuned_verify_arch() {
-    local so_file="$1"
-    if [[ ! -f "${so_file}" ]]; then
-        echo "ERROR: gpu_tuned_verify_arch: no such file: ${so_file}" >&2
-        return 1
-    fi
-    command -v cuobjdump >/dev/null 2>&1 || {
-        echo "ERROR: gpu_tuned_verify_arch: cuobjdump not found on PATH (expected under \$CUDA_HOME/bin)." >&2
-        return 1
-    }
-    local found found_count
-    found="$(cuobjdump --list-elf "${so_file}" 2>/dev/null | grep -oE 'sm_[0-9]+[a-z]?' | sort -u)"
-    if [[ -z "${found}" ]]; then
-        echo "ERROR: gpu_tuned_verify_arch: cuobjdump found no embedded cubins in ${so_file} at all." >&2
-        return 1
-    fi
-    found_count="$(echo "${found}" | wc -l)"
-    if [[ "${found_count}" -ne 1 ]]; then
-        echo "ERROR: ${so_file} embeds MULTIPLE arch targets ($(echo "${found}" | tr '\n' ' ')) -- this is supposed to be a single-arch tuned build, not a fat multi-arch one." >&2
-        return 1
-    fi
-    if [[ "${found}" != "sm_${GPU_TUNED_CUDA_ARCH}" ]]; then
-        echo "ERROR: ${so_file} is not built for sm_${GPU_TUNED_CUDA_ARCH} (found: ${found})." >&2
-        return 1
-    fi
-    echo "OK: ${so_file} confirmed single-arch ${found} (matches requested sm_${GPU_TUNED_CUDA_ARCH})"
-}
-
-# gpu_tuned_verify_cuda_compat <path-to-.so> <expected-cuda-ver> — confirms
-# a compiled library's NEEDED libcudart.so.<major> matches the CUDA major
-# version this build expects. CUDA's runtime ABI is only guaranteed
-# forward-compatible WITHIN a major series (e.g. built against 13.2 but
-# running against 13.3 is fine; 12.x vs 13.x is not) -- so this checks
-# major only, by design. Complements gpu_tuned_verify_arch (SM arch) with
-# the orthogonal CUDA-runtime-version axis. Same name/signature as
-# zbrad/faiss's tuned/env.sh equivalent, which also calls this on a
-# downloaded cuvs release .so before linking against it.
-gpu_tuned_verify_cuda_compat() {
-    local so_file="$1" expected_cuda_ver="$2"
-    if [[ ! -f "${so_file}" ]]; then
-        echo "ERROR: gpu_tuned_verify_cuda_compat: no such file: ${so_file}" >&2
-        return 1
-    fi
-    command -v objdump >/dev/null 2>&1 || {
-        echo "ERROR: gpu_tuned_verify_cuda_compat: objdump not found on PATH." >&2
-        return 1
-    }
-    local needed found_major expected_major
-    needed="$(objdump -p "${so_file}" 2>/dev/null | grep -oE 'libcudart\.so\.[0-9]+' | head -1)"
-    if [[ -z "${needed}" ]]; then
-        echo "WARNING: ${so_file} has no direct libcudart.so.N NEEDED entry -- skipping CUDA runtime compat check." >&2
-        return 0
-    fi
-    found_major="${needed##*.}"
-    expected_major="${expected_cuda_ver%%.*}"
-    if [[ "${found_major}" != "${expected_major}" ]]; then
-        echo "ERROR: ${so_file} was linked against CUDA runtime major ${found_major}" \
-             "(${needed}), but this build expects CUDA ${expected_cuda_ver}" \
-             "(major ${expected_major}). CUDA's runtime ABI is only forward-compatible" \
-             "within the same major version." >&2
-        return 1
-    fi
-    echo "OK: ${so_file} CUDA runtime compat confirmed (${needed}, matches expected major ${expected_major})"
-}
 
 # embed_build_info <so_path> <variant> <package> <version> [hw_label] —
 # embeds a greppable build-info string into a custom ELF section

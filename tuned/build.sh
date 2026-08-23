@@ -280,7 +280,7 @@ LIBDIR="${REPODIR}/cpp/build"
 EXPECTED_LIB="${LIBDIR}/lib${CUVS_LIB_NAME}.so"
 if [[ -f "${EXPECTED_LIB}" ]]; then
   echo "  Library built: ${EXPECTED_LIB} ($(du -h "${EXPECTED_LIB}" | cut -f1))"
-  gpu_tuned_verify_arch "${EXPECTED_LIB}" || exit 1
+  gpu_tuned_verify_arch "${EXPECTED_LIB}" "${GPU_TUNED_CUDA_ARCH}" || exit 1
 else
   echo "WARNING: Expected lib${CUVS_LIB_NAME}.so not found in ${LIBDIR}"
   echo "  Files present: $(ls "${LIBDIR}"/libcuvs*.so 2>/dev/null || echo 'none')"
