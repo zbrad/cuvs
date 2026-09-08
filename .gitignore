@@ -97,3 +97,9 @@ libcuvs*.tar.gz
 
 # extracted zbrad/raft release (tuned/build.sh's resolve_raft_release cache)
 /tuned/_raft_release/
+
+# full_test.sh results log (attached as a release asset, not committed)
+tuned/releases/TEST_RESULTS_*.log
+
+# GPUDirect Storage compat-mode log, written to cwd by some cuvs test binaries
+/cufile.log

@@ -41,6 +41,11 @@ CUVS_VERSION="$(tr -d '\r' < "${REPODIR}/VERSION")"
 # stamp and the informational "Version:" line above, where precision
 # matters more than brevity.
 SHORT_VER="$(echo "${CUVS_VERSION}" | sed -E 's/^0*([0-9]+)\.0*([0-9]+)\..*/\1.\2/')"
+# -g<short-sha> suffix: SHORT_VER alone collides across genuinely
+# different rebuilds (VERSION only bumps on a real upstream release cut)
+# -- matches zbrad/raft's tuned/package.sh, which hit exactly this
+# collision 2026-09-08 (had to delete-and-recreate a tag to republish).
+SHORT_SHA="$(git -C "${REPODIR}" rev-parse --short HEAD)"
 
 # Must match tuned/build.sh's own default resolution exactly -- this script
 # does not rebuild, it packages whatever tuned/build.sh already installed.
@@ -79,14 +84,14 @@ echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
 DIST_DIR="${REPODIR}/dist/${GPU_TUNED_VARIANT}"
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
-TARBALL="${DIST_DIR}/libcuvs-${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}.tar.gz"
+TARBALL="${DIST_DIR}/libcuvs-${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}-g${SHORT_SHA}.tar.gz"
 
 echo ""
 echo "Packaging ${INSTALL_PREFIX} -> ${TARBALL}..."
 tar -C "${INSTALL_PREFIX}" -czf "${TARBALL}" .
 echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}'))"
 
-RELEASE_TAG="v${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}"
+RELEASE_TAG="v${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}-g${SHORT_SHA}"
 RELEASE_TITLE="cuVS ${SHORT_VER} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
 
 # Publish gate: refuse without a fresh, passing full-test-suite run.
