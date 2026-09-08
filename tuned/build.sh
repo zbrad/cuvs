@@ -54,13 +54,20 @@ resolve_raft_release() {
 
     echo "Looking up zbrad/raft tuned-builds release for ${variant}-${cuda_tag}..."
     local tag
-    # raft now publishes v<ver>-<variant>-<cuda_tag>, the same order as
-    # this repo's own release tags -- match the same way faiss matches
-    # cuvs's tags. (Was variant-suffix-only, back when raft's tag order
-    # was v<ver>.0-cuda<compact>-<variant>, cuda tag *before* variant --
-    # that's been unified to match cuvs's order now.)
+    # raft now publishes v<ver>-<variant>-<cuda_tag>[-g<short-sha>], the
+    # same order as this repo's own release tags -- match the same way
+    # faiss matches cuvs's tags. (Was variant-suffix-only, back when
+    # raft's tag order was v<ver>.0-cuda<compact>-<variant>, cuda tag
+    # *before* variant -- that's been unified to match cuvs's order now.)
+    # The optional -g<sha> suffix (added 2026-09-08, see raft's own
+    # tuned/package.sh/release.sh comments) is why this can no longer
+    # anchor on end-of-string with a bare \$ -- that regex silently fell
+    # through to an older, unsuffixed release instead of the newest one,
+    # exactly the kind of stale-pairing bug the suffix exists to prevent.
+    # `gh release list` is already newest-first, so `head -1` still picks
+    # the right one once the anchor allows the suffix.
     tag="$(gh release list --repo zbrad/raft --json tagName -q '.[].tagName' 2>/dev/null \
-        | grep -E -- "-${variant}-${cuda_tag}\$" | head -1)"
+        | grep -E -- "-${variant}-${cuda_tag}(-g[0-9a-f]+)?\$" | head -1)"
     if [[ -z "${tag}" ]]; then
         echo "ERROR: no zbrad/raft release found matching '*-${variant}'." >&2
         echo "  Available releases:" >&2
@@ -103,6 +110,27 @@ source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
 
 CUDA_ARCHS="${GPU_TUNED_CUDA_ARCH}-real"
 CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"  # e.g. cuvs-rtx50-cu132
+
+# rapids-cmake-sha: pin to a fixed commit instead of letting RAPIDS.cmake
+# fall through to RAPIDS_BRANCH ("main", an upstream file -- don't edit
+# it, it'll just get overwritten on the next upstream sync anyway).
+# RAPIDS.cmake's own precedence rules give an explicit -Drapids-cmake-sha
+# priority over the branch, so this is the supported override point, not
+# a hack. Without this, two builds done at different times can silently
+# resolve different transitive dependency versions (rapids-cmake's own
+# pins move on its unpinned main) -- confirmed 2026-09-08: raft and cuvs
+# builds a few hours apart disagreed on rapids_logger (0.2.3 vs 0.3.0),
+# breaking this configure (duplicate ALIAS target) since cuvs links
+# against raft's published/local install tree either way.
+#
+# Sibling pin: zbrad/raft's tuned/build.sh carries the identical SHA --
+# keep both in sync by hand when bumping (grep RAPIDS_CMAKE_PIN_SHA in
+# each repo's tuned/build.sh). Update by picking a fresh
+# `git ls-remote https://github.com/rapidsai/rapids-cmake.git main`
+# HEAD, confirming both repos still configure cleanly against it, then
+# updating both files together in the same sitting -- never one without
+# the other, that's exactly the drift this exists to prevent.
+RAPIDS_CMAKE_PIN_SHA="8fc2d05e4b29a2fb7a355192ce19190fcf24c37f"
 
 resolve_raft_release "${GPU_TUNED_VARIANT}" "${CUDA_TAG}"
 
@@ -198,6 +226,7 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   -DBUILD_SHARED_LIBS=ON \
   "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}" \
   "-DCMAKE_PREFIX_PATH=${RAFT_RELEASE_DIR}" \
+  "-Drapids-cmake-sha=${RAPIDS_CMAKE_PIN_SHA}" \
   "${CMAKE_LAUNCHER_ARGS[@]}" \
   "${NCCL_CMAKE_ARGS[@]}"
 
