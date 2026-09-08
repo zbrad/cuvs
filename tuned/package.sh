@@ -89,6 +89,31 @@ echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}
 RELEASE_TAG="v${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}"
 RELEASE_TITLE="cuVS ${SHORT_VER} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
 
+# Publish gate: refuse without a fresh, passing full-test-suite run.
+# "Fresh" = newer than the built .so, not just present -- a stale pass
+# from before the last code change would otherwise silently satisfy this
+# check. See tuned/full_test.sh (GPU_TUNED_BUILD_TESTS=1 rebuild
+# required first -- this repo's default build skips tests entirely),
+# which writes this file and is the only thing that should.
+TEST_RESULTS_FILE="${REPODIR}/tuned/releases/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
+if [[ ! -f "${TEST_RESULTS_FILE}" ]]; then
+    echo "ERROR: ${TEST_RESULTS_FILE} not found." >&2
+    echo "  Run: GPU_TUNED_BUILD_TESTS=1 bash tuned/build.sh ${GPU_TUNED_VARIANT} && bash tuned/full_test.sh ${GPU_TUNED_VARIANT}" >&2
+    exit 1
+fi
+if [[ "${INSTALLED_LIB}" -nt "${TEST_RESULTS_FILE}" ]]; then
+    echo "ERROR: ${INSTALLED_LIB} is newer than ${TEST_RESULTS_FILE} -- the test results predate the current build." >&2
+    echo "  Re-run tuned/full_test.sh ${GPU_TUNED_VARIANT} before publishing." >&2
+    exit 1
+fi
+if ! grep -q "All binaries passed\." "${TEST_RESULTS_FILE}"; then
+    echo "ERROR: ${TEST_RESULTS_FILE} does not show a clean pass -- not publishing." >&2
+    echo "  Last lines:" >&2
+    tail -20 "${TEST_RESULTS_FILE}" >&2
+    exit 1
+fi
+echo "Test gate: ${TEST_RESULTS_FILE} shows a clean pass, newer than the built library. Proceeding."
+
 echo ""
 echo "Publishing to GitHub release ${RELEASE_TAG}..."
 gh release create "${RELEASE_TAG}" \
@@ -96,7 +121,8 @@ gh release create "${RELEASE_TAG}" \
     --title "${RELEASE_TITLE}" \
     --target "tuned-builds" \
     --notes "lib${CUVS_LIB_NAME}.so ${SHORT_VER} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh)." \
-    "${TARBALL}#$(basename "${TARBALL}")"
+    "${TARBALL}#$(basename "${TARBALL}")" \
+    "${TEST_RESULTS_FILE}#Full test suite results (${GPU_TUNED_VARIANT})"
 
 echo ""
 echo "Release: https://github.com/zbrad/cuvs/releases/tag/${RELEASE_TAG}"

@@ -190,8 +190,8 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   -DCUVS_NVTX=ON \
   -DCUDA_LOG_COMPILE_TIME=OFF \
   -DDISABLE_DEPRECATION_WARNINGS=ON \
-  -DBUILD_TESTS=OFF \
-  -DBUILD_C_TESTS=OFF \
+  -DBUILD_TESTS="${GPU_TUNED_BUILD_TESTS:-OFF}" \
+  -DBUILD_C_TESTS="${GPU_TUNED_BUILD_TESTS:-OFF}" \
   -DBUILD_CUVS_BENCH=OFF \
   -DBUILD_CPU_ONLY=OFF \
   -DBUILD_MG_ALGOS="${GPU_TUNED_BUILD_MG_ALGOS}" \
@@ -210,7 +210,16 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
 # so this stays informational, not a hard gate.
 cuvs_check_raft_version "${LIBCUVS_BUILD_DIR}" "${REPODIR}"
 
-cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c install
+# GPU_TUNED_BUILD_TESTS=1 (see tuned/full_test.sh) builds every gtest
+# target too, not just the narrow cuvs/cuvs_c/install path -- "install"
+# isn't part of plain `--target all`'s dependency graph by default, so it
+# stays a separate explicit step either way.
+if [[ "${GPU_TUNED_BUILD_TESTS:-OFF}" == "ON" ]]; then
+  cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}"
+  cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target install
+else
+  cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c install
+fi
 
 # cuvs-config.cmake (installed above) exports cuvs::cuvs with a link
 # interface that references raft::raft and rmm::rmm as real CMake
