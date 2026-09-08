@@ -45,7 +45,16 @@ for bin in "${BINARIES[@]}"; do
     {
         echo "=== ${name} ==="
     } | tee -a "${RESULTS_FILE}"
-    if ! "${bin}" 2>&1 | tee -a "${RESULTS_FILE}"; then
+    # CutileSmoke.RequiresJitLinkCapableDriver is a deliberate canary that
+    # stays red until a future driver ships libnvidia-gpucomp.so -- see its
+    # comment in cpp/tests/detail/jit_lto/cutile_smoke.cu. Excluded here so
+    # it doesn't block the release gate; run CUTILE_SMOKE_TEST directly
+    # (no filter) to check whether it's started passing.
+    extra_args=()
+    if [[ "${name}" == "CUTILE_SMOKE_TEST" ]]; then
+        extra_args+=(--gtest_filter=-CutileSmoke.RequiresJitLinkCapableDriver)
+    fi
+    if ! "${bin}" "${extra_args[@]}" 2>&1 | tee -a "${RESULTS_FILE}"; then
         FAILED+=("${name}")
         STATUS=1
     fi
