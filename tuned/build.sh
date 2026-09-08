@@ -132,6 +132,22 @@ CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"  # e.g. cuvs-rtx50-cu132
 # the other, that's exactly the drift this exists to prevent.
 RAPIDS_CMAKE_PIN_SHA="8fc2d05e4b29a2fb7a355192ce19190fcf24c37f"
 
+# CUTILE_PYTHON: which interpreter cmake's generate_cutile_kernels.cmake
+# uses to import cuda.tile (the "cuTile Python" build dependency, see
+# cuvs_find_build_python() in cmake/modules/compute_matrix_product.cmake).
+# That macro does a plain find_package(Python), which on this box can
+# resolve either the system `python3` (3.14, where `pip install
+# "cuda-tile[tileiras]"` actually landed the package) or a separate
+# uv-managed `python3.11` (deliberately protected -- "should not be
+# modified" -- pip/uv both refuse to install into it directly), depending
+# on PATH order and whatever CMake's search happened to cache last.
+# Pointing it explicitly at `command -v python3` avoids relying on that
+# resolution order at all, rather than modifying the protected
+# interpreter to satisfy it. `./build.sh clean` (further down) wipes
+# CMakeCache.txt every run, so a one-off `-DPython_EXECUTABLE` fix here
+# doesn't stick across invocations unless it's baked into this script.
+CUTILE_PYTHON="$(command -v python3)"
+
 resolve_raft_release "${GPU_TUNED_VARIANT}" "${CUDA_TAG}"
 
 echo "===================================================="
@@ -227,6 +243,7 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}" \
   "-DCMAKE_PREFIX_PATH=${RAFT_RELEASE_DIR}" \
   "-Drapids-cmake-sha=${RAPIDS_CMAKE_PIN_SHA}" \
+  "-DPython_EXECUTABLE=${CUTILE_PYTHON}" \
   "${CMAKE_LAUNCHER_ARGS[@]}" \
   "${NCCL_CMAKE_ARGS[@]}"
 
