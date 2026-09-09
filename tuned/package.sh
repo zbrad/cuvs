@@ -70,6 +70,35 @@ if [[ ! -f "${INSTALLED_LIB}" ]]; then
 fi
 gpu_tuned_verify_arch "${INSTALLED_LIB}" "${GPU_TUNED_CUDA_ARCH}" || exit 1
 gpu_tuned_verify_cuda_compat "${INSTALLED_LIB}" "${CUDA_VER}" || exit 1
+
+# Publish gate: refuse without a fresh, passing full-test-suite run.
+# "Fresh" = newer than the built .so, not just present -- a stale pass
+# from before the last code change would otherwise silently satisfy this
+# check. See tuned/full_test.sh (GPU_TUNED_BUILD_TESTS=1 rebuild
+# required first -- this repo's default build skips tests entirely),
+# which writes this file and is the only thing that should. Runs BEFORE
+# embed_build_info below, which rewrites INSTALLED_LIB's mtime (objcopy)
+# -- checking after that would make a genuinely fresh, clean test run
+# fail this gate every single time.
+TEST_RESULTS_FILE="${REPODIR}/tuned/releases/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
+if [[ ! -f "${TEST_RESULTS_FILE}" ]]; then
+    echo "ERROR: ${TEST_RESULTS_FILE} not found." >&2
+    echo "  Run: GPU_TUNED_BUILD_TESTS=1 bash tuned/build.sh ${GPU_TUNED_VARIANT} && bash tuned/full_test.sh ${GPU_TUNED_VARIANT}" >&2
+    exit 1
+fi
+if [[ "${INSTALLED_LIB}" -nt "${TEST_RESULTS_FILE}" ]]; then
+    echo "ERROR: ${INSTALLED_LIB} is newer than ${TEST_RESULTS_FILE} -- the test results predate the current build." >&2
+    echo "  Re-run tuned/full_test.sh ${GPU_TUNED_VARIANT} before publishing." >&2
+    exit 1
+fi
+if ! grep -q "All binaries passed\." "${TEST_RESULTS_FILE}"; then
+    echo "ERROR: ${TEST_RESULTS_FILE} does not show a clean pass -- not publishing." >&2
+    echo "  Last lines:" >&2
+    tail -20 "${TEST_RESULTS_FILE}" >&2
+    exit 1
+fi
+echo "Test gate: ${TEST_RESULTS_FILE} shows a clean pass, newer than the built library. Proceeding."
+
 embed_build_info "${INSTALLED_LIB}" "${GPU_TUNED_VARIANT}" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" "${GPU_TUNED_HW_LABEL}"
 
 CUVS_CMAKE_CONFIG="$(find "${INSTALL_PREFIX}" -maxdepth 4 -iname 'cuvs-config.cmake' 2>/dev/null | head -1)"
@@ -93,31 +122,6 @@ echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}
 
 RELEASE_TAG="v${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}-g${SHORT_SHA}"
 RELEASE_TITLE="cuVS ${SHORT_VER} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
-
-# Publish gate: refuse without a fresh, passing full-test-suite run.
-# "Fresh" = newer than the built .so, not just present -- a stale pass
-# from before the last code change would otherwise silently satisfy this
-# check. See tuned/full_test.sh (GPU_TUNED_BUILD_TESTS=1 rebuild
-# required first -- this repo's default build skips tests entirely),
-# which writes this file and is the only thing that should.
-TEST_RESULTS_FILE="${REPODIR}/tuned/releases/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
-if [[ ! -f "${TEST_RESULTS_FILE}" ]]; then
-    echo "ERROR: ${TEST_RESULTS_FILE} not found." >&2
-    echo "  Run: GPU_TUNED_BUILD_TESTS=1 bash tuned/build.sh ${GPU_TUNED_VARIANT} && bash tuned/full_test.sh ${GPU_TUNED_VARIANT}" >&2
-    exit 1
-fi
-if [[ "${INSTALLED_LIB}" -nt "${TEST_RESULTS_FILE}" ]]; then
-    echo "ERROR: ${INSTALLED_LIB} is newer than ${TEST_RESULTS_FILE} -- the test results predate the current build." >&2
-    echo "  Re-run tuned/full_test.sh ${GPU_TUNED_VARIANT} before publishing." >&2
-    exit 1
-fi
-if ! grep -q "All binaries passed\." "${TEST_RESULTS_FILE}"; then
-    echo "ERROR: ${TEST_RESULTS_FILE} does not show a clean pass -- not publishing." >&2
-    echo "  Last lines:" >&2
-    tail -20 "${TEST_RESULTS_FILE}" >&2
-    exit 1
-fi
-echo "Test gate: ${TEST_RESULTS_FILE} shows a clean pass, newer than the built library. Proceeding."
 
 echo ""
 echo "Publishing to GitHub release ${RELEASE_TAG}..."
