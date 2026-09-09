@@ -256,6 +256,14 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
 # so this stays informational, not a hard gate.
 cuvs_check_raft_version "${LIBCUVS_BUILD_DIR}" "${REPODIR}"
 
+# CCCL 3.4.0 is the minimum that includes the warpspeed-scan fixes needed
+# to avoid a real memory-corruption bug on Blackwell/SM_12x -- see
+# gpu_tuned_verify_cccl_version's own comment in tuned/common.sh for the
+# full story (NVIDIA/raft#3141, closed once verified unnecessary against
+# current CCCL). A hard gate, not informational: an old CCCL here means a
+# real, previously-hit corruption bug, not just a version mismatch.
+gpu_tuned_verify_cccl_version "${LIBCUVS_BUILD_DIR}/_deps/cccl-src" "3.4.0" || exit 1
+
 # GPU_TUNED_BUILD_TESTS=1 (see tuned/full_test.sh) builds every gtest
 # target too, not just the narrow cuvs/cuvs_c/install path -- "install"
 # isn't part of plain `--target all`'s dependency graph by default, so it
