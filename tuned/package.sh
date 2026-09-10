@@ -40,7 +40,7 @@ CUVS_VERSION="$(tr -d '\r' < "${REPODIR}/VERSION")"
 # title below; CUVS_VERSION (full, unshortened) stays in the build-info
 # stamp and the informational "Version:" line above, where precision
 # matters more than brevity.
-SHORT_VER="$(echo "${CUVS_VERSION}" | sed -E 's/^0*([0-9]+)\.0*([0-9]+)\..*/\1.\2/')"
+SHORT_VER="$(gpu_tuned_short_ver "${CUVS_VERSION}")" || exit 1
 # -g<short-sha> suffix: SHORT_VER alone collides across genuinely
 # different rebuilds (VERSION only bumps on a real upstream release cut)
 # -- matches zbrad/raft's tuned/package.sh, which hit exactly this
