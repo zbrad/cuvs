@@ -125,11 +125,8 @@ RELEASE_TITLE="cuVS ${SHORT_VER} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
 
 echo ""
 echo "Publishing to GitHub release ${RELEASE_TAG}..."
-gh release create "${RELEASE_TAG}" \
-    --repo zbrad/cuvs \
-    --title "${RELEASE_TITLE}" \
-    --target "tuned-builds" \
-    --notes "lib${CUVS_LIB_NAME}.so ${SHORT_VER} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh)." \
+gpu_tuned_publish_release "zbrad/cuvs" "${RELEASE_TAG}" "${RELEASE_TITLE}" \
+    "lib${CUVS_LIB_NAME}.so ${SHORT_VER} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh)." \
     "${TARBALL}#$(basename "${TARBALL}")" \
     "${TEST_RESULTS_FILE}#Full test suite results (${GPU_TUNED_VARIANT})"
 
