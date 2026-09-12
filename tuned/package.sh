@@ -100,6 +100,11 @@ fi
 echo "Test gate: ${TEST_RESULTS_FILE} shows a clean pass, newer than the built library. Proceeding."
 
 embed_build_info "${INSTALLED_LIB}" "${GPU_TUNED_VARIANT}" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" "${GPU_TUNED_HW_LABEL}"
+# Confirm the stamp actually landed before archiving -- the tarball is a
+# straight `tar -czf` of INSTALL_PREFIX below with no further build/install
+# pass, so this should always pass, but every other repo in this fleet
+# validates its stamp right after writing it rather than assuming.
+gpu_tuned_verify_build_info "${INSTALLED_LIB}" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" || exit 1
 
 CUVS_CMAKE_CONFIG="$(find "${INSTALL_PREFIX}" -maxdepth 4 -iname 'cuvs-config.cmake' 2>/dev/null | head -1)"
 if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then
