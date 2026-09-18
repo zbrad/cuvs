@@ -185,6 +185,8 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
 
   void compare()
   {
+    // GTEST_SKIP() in compute_1nn() only returns from that helper, not the test body.
+    if (::testing::Test::IsSkipped()) { return; }
     if constexpr (impl == ImplType::fused) {
       if (backend == cuvs::distance::detail::Top1nnBackend::Cutile) {
         // cuTile MMA arithmetic can produce a different index for nearly tied candidates.
