@@ -17,6 +17,19 @@ REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-${REPODIR}/cpp/build}"
 GTESTS_DIR="${LIBCUVS_BUILD_DIR}/gtests"
 
+# Excluded from the gate: CLUSTER_TEST's KmeansFitBatchedTestF.Result/4.
+# It fails ~50% of runs on GB10 (22/50 on CUDA 13.3, 26/50 on 13.4) for
+# reasons unrelated to this repo: kmeans::fit is not bit-reproducible
+# run-to-run (atomic reductions), and this shape sits exactly on the
+# convergence threshold, so the stopping iteration flips between 11 and 14
+# and the test's 1e-2 centroid match then fails. Both outcomes are
+# equally good clusterings (inertia within ~1e-5). Reproduced with the
+# in-memory fit alone, so it is not specific to the batched path.
+# Upstream: https://github.com/NVIDIA/cuvs/issues/2657 (see also #2100).
+# It is still run once and its result recorded, but it never fails the
+# gate. Remove this exclusion once #2657 is resolved upstream.
+KNOWN_FLAKY_CLUSTER_CASE='KmeansFitBatchedTests/KmeansFitBatchedTestF.Result/4'
+
 if [[ ! -d "${GTESTS_DIR}" ]]; then
     echo "ERROR: ${GTESTS_DIR} not found -- build with GPU_TUNED_BUILD_TESTS=1 bash tuned/build.sh ${GPU_TUNED_ARG_VARIANT} first." >&2
     exit 1
@@ -40,32 +53,32 @@ fi
 
 FAILED=()
 STATUS=0
+FLAKY_RESULT="not run (CLUSTER_TEST not present)"
 for bin in "${BINARIES[@]}"; do
     name="$(basename "${bin}")"
+    gtest_args=()
+    if [[ "${name}" == "CLUSTER_TEST" ]]; then
+        gtest_args=("--gtest_filter=-${KNOWN_FLAKY_CLUSTER_CASE}")
+    fi
     {
         echo "=== ${name} ==="
+        if [[ ${#gtest_args[@]} -gt 0 ]]; then
+            echo "(excluding known-flaky ${KNOWN_FLAKY_CLUSTER_CASE}, see NVIDIA/cuvs#2657)"
+        fi
     } | tee -a "${RESULTS_FILE}"
-    if ! "${bin}" 2>&1 | tee -a "${RESULTS_FILE}"; then
-        # CLUSTER_TEST only: confirmed flaky, not a regression -- reproduced
-        # 2 failures / 1 pass across 3 back-to-back reruns with zero code
-        # changes, isolated to KmeansFitBatchedTestF's KMeans++ random
-        # subsample (centroids_match tolerance miss at a single coordinate,
-        # cpp/tests/cluster/kmeans.cu:682). Pre-existing upstream behavior,
-        # unrelated to any change in this repo -- retry this one binary
-        # once rather than cost a ~2h full-suite rerun on a coin-flip. A
-        # failure on the retry is treated as real and still fails the gate.
-        if [[ "${name}" == "CLUSTER_TEST" ]]; then
-            {
-                echo ""
-                echo "--- ${name} failed; retrying once (known-flaky KMeans++ random subsample, see tuned/docs/RELEASE_PINS.md) ---"
-            } | tee -a "${RESULTS_FILE}"
-            if ! "${bin}" 2>&1 | tee -a "${RESULTS_FILE}"; then
-                FAILED+=("${name}")
-                STATUS=1
-            fi
+    if ! "${bin}" "${gtest_args[@]}" 2>&1 | tee -a "${RESULTS_FILE}"; then
+        FAILED+=("${name}")
+        STATUS=1
+    fi
+    if [[ "${name}" == "CLUSTER_TEST" ]]; then
+        {
+            echo ""
+            echo "--- ${name}: known-flaky ${KNOWN_FLAKY_CLUSTER_CASE} run once, INFORMATIONAL ONLY (not gating) ---"
+        } | tee -a "${RESULTS_FILE}"
+        if "${bin}" "--gtest_filter=${KNOWN_FLAKY_CLUSTER_CASE}" 2>&1 | tee -a "${RESULTS_FILE}"; then
+            FLAKY_RESULT="passed this run"
         else
-            FAILED+=("${name}")
-            STATUS=1
+            FLAKY_RESULT="failed this run (expected ~50%; does not affect the gate)"
         fi
     fi
 done
@@ -73,6 +86,7 @@ done
 {
     echo ""
     echo "=== Full test suite summary: $(( ${#BINARIES[@]} - ${#FAILED[@]} ))/${#BINARIES[@]} binaries passed ==="
+    echo "Excluded from gate (known-flaky, NVIDIA/cuvs#2657): ${KNOWN_FLAKY_CLUSTER_CASE} -- ${FLAKY_RESULT}"
     if [[ ${#FAILED[@]} -gt 0 ]]; then
         echo "FAILED: ${FAILED[*]}"
     else
