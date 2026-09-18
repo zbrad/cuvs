@@ -988,7 +988,7 @@ template <typename V>
 inline constexpr bool is_dense_row_major_device_dataset_view_v =
   is_device_padded_dataset_view_v<V> || is_device_standard_dataset_view_v<V>;
 
-/** True for host or device padded/standard views (iterative graph build; VPQ excluded). */
+/** True for host or device padded/standard views (dense graph build; VPQ excluded). */
 template <typename V>
 inline constexpr bool is_dense_row_major_dataset_view_v =
   is_padded_dataset_view_v<V> || is_standard_dataset_view_v<V>;
@@ -1168,7 +1168,7 @@ auto make_device_dense_row_major_dataset_from_src(raft::resources const& res,
   RAFT_CUDA_TRY(cudaMemsetAsync(out_array.data_handle(),
                                 0,
                                 out_array.size() * sizeof(ValueT),
-                                raft::resource::get_cuda_stream(res)));
+                                raft::resource::get_cuda_stream(res).get()));
   raft::copy_matrix(out_array.data_handle(),
                     target_stride,
                     src.data_handle(),
