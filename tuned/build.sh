@@ -174,7 +174,7 @@ cd "$REPODIR"
 echo "Starting lib${CUVS_LIB_NAME} build for ${GPU_TUNED_HW_LABEL}..."
 echo ""
 
-LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-${REPODIR}/cpp/build}"
+LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-"$(gpu_tuned_out_dir build "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-${PREFIX:-${CONDA_PREFIX:-${LIBCUVS_BUILD_DIR}/install}}}"
 PARALLEL_LEVEL="${PARALLEL_LEVEL:-$(nproc)}"
 
@@ -339,7 +339,7 @@ else
 fi
 
 # Verify output
-LIBDIR="${REPODIR}/cpp/build"
+LIBDIR="${LIBCUVS_BUILD_DIR}"
 EXPECTED_LIB="${LIBDIR}/lib${CUVS_LIB_NAME}.so"
 if [[ -f "${EXPECTED_LIB}" ]]; then
   echo "  Library built: ${EXPECTED_LIB} ($(du -h "${EXPECTED_LIB}" | cut -f1))"

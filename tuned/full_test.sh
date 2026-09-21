@@ -1,6 +1,6 @@
 #!/bin/bash
 # tuned/full_test.sh <variant> — run every built gtest binary
-# (cpp/build/gtests/*) for a GPU_TUNED_BUILD_TESTS=1 build. cuvs's tuned
+# (cpp/build/<cuda_tag>/<variant>/gtests/*) for a GPU_TUNED_BUILD_TESTS=1 build. cuvs's tuned
 # build normally skips tests entirely (-DBUILD_TESTS=OFF, see build.sh) --
 # this is the opt-in path: rebuild with GPU_TUNED_BUILD_TESTS=1 first,
 # then run this before publishing.
@@ -14,7 +14,9 @@ set -euo pipefail
 
 GPU_TUNED_ARG_VARIANT="$1"
 REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-${REPODIR}/cpp/build}"
+# shellcheck source=env.sh
+source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
+LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-"$(gpu_tuned_out_dir build "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"}"
 GTESTS_DIR="${LIBCUVS_BUILD_DIR}/gtests"
 
 # Excluded from the gate: CLUSTER_TEST's KmeansFitBatchedTestF.Result/4.
@@ -35,8 +37,9 @@ if [[ ! -d "${GTESTS_DIR}" ]]; then
     exit 1
 fi
 
-mkdir -p "${REPODIR}/tuned/releases"
-RESULTS_FILE="${REPODIR}/tuned/releases/TEST_RESULTS_${GPU_TUNED_ARG_VARIANT}.log"
+RELEASES_DIR="$(gpu_tuned_out_dir releases "${REPODIR}" "${CUDA_TAG}")"
+mkdir -p "${RELEASES_DIR}"
+RESULTS_FILE="${RELEASES_DIR}/TEST_RESULTS_${GPU_TUNED_ARG_VARIANT}.log"
 
 {
     echo "cuvs full test suite -- variant=${GPU_TUNED_ARG_VARIANT}"

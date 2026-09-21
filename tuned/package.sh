@@ -49,7 +49,7 @@ SHORT_SHA="$(git -C "${REPODIR}" rev-parse --short HEAD)"
 
 # Must match tuned/build.sh's own default resolution exactly -- this script
 # does not rebuild, it packages whatever tuned/build.sh already installed.
-LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-${REPODIR}/cpp/build}"
+LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-"$(gpu_tuned_out_dir build "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-${PREFIX:-${CONDA_PREFIX:-${LIBCUVS_BUILD_DIR}/install}}}"
 
 echo "===================================================="
@@ -82,7 +82,7 @@ gpu_tuned_verify_cuda_compat "${INSTALLED_LIB}" "${CUDA_VER}" || exit 1
 # INSTALLED_LIB: embed_build_info below rewrites INSTALLED_LIB (objcopy) on
 # every packaging run, so its mtime moves past the test results and the gate
 # would pass only once per test run. Same approach as zbrad/raft's release.sh.
-TEST_RESULTS_FILE="${REPODIR}/tuned/releases/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
+TEST_RESULTS_FILE="$(gpu_tuned_out_dir releases "${REPODIR}" "${CUDA_TAG}")/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
 BUILT_LIB="${LIBCUVS_BUILD_DIR}/lib${CUVS_LIB_NAME}.so"
 if [[ ! -f "${BUILT_LIB}" ]]; then
     echo "ERROR: ${BUILT_LIB} not found -- cannot tell whether the test results are fresh." >&2
@@ -106,6 +106,14 @@ if ! grep -q "All binaries passed\." "${TEST_RESULTS_FILE}"; then
     exit 1
 fi
 echo "Test gate: ${TEST_RESULTS_FILE} shows a clean pass, newer than the built library. Proceeding."
+
+# Release notes: use tuned/releases/RELEASE_NOTES_<short_ver>_<variant>_<cuda_tag>.md as
+# the release body when present; a draft still carrying the DRAFT banner must not ship.
+RELEASE_NOTES_FILE="${REPODIR}/tuned/releases/RELEASE_NOTES_${SHORT_VER}_${GPU_TUNED_VARIANT}_${CUDA_TAG}.md"
+if [[ -f "${RELEASE_NOTES_FILE}" ]] && grep -q 'DRAFT — not yet published' "${RELEASE_NOTES_FILE}"; then
+    echo "ERROR: ${RELEASE_NOTES_FILE} is still a draft (DRAFT banner present) -- not publishing." >&2
+    exit 1
+fi
 
 # libcuvs (and libcuvs_c) link kvikio, a CPM subproject that cuvs's own
 # install does not install. Without libkvikio.so in the tarball the release
@@ -158,7 +166,7 @@ echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
 # Refuse to publish a package whose libraries need something it does not ship.
 bash "${REPODIR}/tuned/verify_bundled_deps.sh" "${INSTALL_PREFIX}" || exit 1
 
-DIST_DIR="${REPODIR}/dist/${GPU_TUNED_VARIANT}"
+DIST_DIR="$(gpu_tuned_out_dir dist "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
 TARBALL="${DIST_DIR}/libcuvs-${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}-g${SHORT_SHA}.tar.gz"
@@ -174,7 +182,7 @@ RELEASE_TITLE="cuVS ${SHORT_VER} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
 echo ""
 echo "Publishing to GitHub release ${RELEASE_TAG}..."
 gpu_tuned_publish_release "zbrad/cuvs" "${RELEASE_TAG}" "${RELEASE_TITLE}" \
-    "lib${CUVS_LIB_NAME}.so ${SHORT_VER} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh)." \
+    "$([[ -f "${RELEASE_NOTES_FILE}" ]] && echo "@${RELEASE_NOTES_FILE}" || echo "lib${CUVS_LIB_NAME}.so ${SHORT_VER} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh).")" \
     "${TARBALL}#$(basename "${TARBALL}")" \
     "${TEST_RESULTS_FILE}#Full test suite results (${GPU_TUNED_VARIANT})"
 

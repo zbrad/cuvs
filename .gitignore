@@ -102,6 +102,7 @@ libcuvs*.tar.gz
 
 # full_test.sh results log (attached as a release asset, not committed)
 tuned/releases/TEST_RESULTS_*.log
+tuned/releases/*/TEST_RESULTS_*.log
 
 # GPUDirect Storage compat-mode log, written to cwd by some cuvs test binaries
 /cufile.log
