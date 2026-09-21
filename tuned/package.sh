@@ -107,6 +107,38 @@ if ! grep -q "All binaries passed\." "${TEST_RESULTS_FILE}"; then
 fi
 echo "Test gate: ${TEST_RESULTS_FILE} shows a clean pass, newer than the built library. Proceeding."
 
+# libcuvs (and libcuvs_c) link kvikio, a CPM subproject that cuvs's own
+# install does not install. Without libkvikio.so in the tarball the release
+# loads only on a machine that still has this build tree (v26.10-gb10-cu133
+# and v26.12-gb10-cu134 shipped that way). Install it from its own generated
+# install script, the same technique tuned/build.sh uses for raft/rmm. Done
+# before stamping so the stamp can record it.
+if readelf -d "${INSTALLED_LIB}" | grep -q 'NEEDED.*libkvikio'; then
+    KVIKIO_INSTALL_SCRIPT="${LIBCUVS_BUILD_DIR}/_deps/kvikio-build/cmake_install.cmake"
+    if [[ ! -f "${KVIKIO_INSTALL_SCRIPT}" ]]; then
+        echo "ERROR: ${INSTALLED_LIB} needs libkvikio.so but ${KVIKIO_INSTALL_SCRIPT} is missing." >&2
+        echo "  Re-run tuned/build.sh ${GPU_TUNED_VARIANT}." >&2
+        exit 1
+    fi
+    echo "Bundling kvikio into ${INSTALL_PREFIX}..."
+    cmake -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -P "${KVIKIO_INSTALL_SCRIPT}"
+fi
+
+# Record what the package bundles in the stamp, read from each bundled cmake
+# package's own version file, so it is visible with `readelf -p` and tells a
+# release that carries kvikio from one that does not.
+BUNDLED_DEPS=""
+for _pkg in kvikio raft rmm rapids_logger; do
+    _ver_file="${INSTALL_PREFIX}/lib/cmake/${_pkg}/${_pkg}-config-version.cmake"
+    if [[ -f "${_ver_file}" ]]; then
+        _ver="$(grep -oE 'PACKAGE_VERSION "[^"]+"' "${_ver_file}" | head -1 | cut -d'"' -f2 || true)"
+        [[ -z "${_ver}" ]] || BUNDLED_DEPS+="${BUNDLED_DEPS:+, }${_pkg} ${_ver}"
+    fi
+done
+unset _pkg _ver_file _ver
+export GPU_TUNED_BUILD_INFO_DEPS="${BUNDLED_DEPS}"
+echo "  bundled deps : ${BUNDLED_DEPS:-none}"
+
 embed_build_info "${INSTALLED_LIB}" "${GPU_TUNED_VARIANT}" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" "${GPU_TUNED_HW_LABEL}"
 # Confirm the stamp actually landed before archiving -- the tarball is a
 # straight `tar -czf` of INSTALL_PREFIX below with no further build/install
@@ -122,22 +154,6 @@ if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then
     exit 1
 fi
 echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
-
-# libcuvs (and libcuvs_c) link kvikio, a CPM subproject that cuvs's own
-# install does not install. Without libkvikio.so in the tarball the release
-# loads only on a machine that still has this build tree (v26.10-gb10-cu133
-# and v26.12-gb10-cu134 shipped that way). Install it from its own generated
-# install script, the same technique tuned/build.sh uses for raft/rmm.
-if readelf -d "${INSTALLED_LIB}" | grep -q 'NEEDED.*libkvikio'; then
-    KVIKIO_INSTALL_SCRIPT="${LIBCUVS_BUILD_DIR}/_deps/kvikio-build/cmake_install.cmake"
-    if [[ ! -f "${KVIKIO_INSTALL_SCRIPT}" ]]; then
-        echo "ERROR: ${INSTALLED_LIB} needs libkvikio.so but ${KVIKIO_INSTALL_SCRIPT} is missing." >&2
-        echo "  Re-run tuned/build.sh ${GPU_TUNED_VARIANT}." >&2
-        exit 1
-    fi
-    echo "Bundling kvikio into ${INSTALL_PREFIX}..."
-    cmake -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -P "${KVIKIO_INSTALL_SCRIPT}"
-fi
 
 # Refuse to publish a package whose libraries need something it does not ship.
 bash "${REPODIR}/tuned/verify_bundled_deps.sh" "${INSTALL_PREFIX}" || exit 1
