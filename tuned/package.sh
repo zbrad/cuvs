@@ -76,18 +76,26 @@ gpu_tuned_verify_cuda_compat "${INSTALLED_LIB}" "${CUDA_VER}" || exit 1
 # from before the last code change would otherwise silently satisfy this
 # check. See tuned/full_test.sh (GPU_TUNED_BUILD_TESTS=1 rebuild
 # required first -- this repo's default build skips tests entirely),
-# which writes this file and is the only thing that should. Runs BEFORE
-# embed_build_info below, which rewrites INSTALLED_LIB's mtime (objcopy)
-# -- checking after that would make a genuinely fresh, clean test run
-# fail this gate every single time.
+# which writes this file and is the only thing that should.
+#
+# Compare against the BUILD-TREE library (what the test binaries link), not
+# INSTALLED_LIB: embed_build_info below rewrites INSTALLED_LIB (objcopy) on
+# every packaging run, so its mtime moves past the test results and the gate
+# would pass only once per test run. Same approach as zbrad/raft's release.sh.
 TEST_RESULTS_FILE="${REPODIR}/tuned/releases/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
+BUILT_LIB="${LIBCUVS_BUILD_DIR}/lib${CUVS_LIB_NAME}.so"
+if [[ ! -f "${BUILT_LIB}" ]]; then
+    echo "ERROR: ${BUILT_LIB} not found -- cannot tell whether the test results are fresh." >&2
+    echo "  Run 'bash tuned/build.sh ${GPU_TUNED_VARIANT}' first." >&2
+    exit 1
+fi
 if [[ ! -f "${TEST_RESULTS_FILE}" ]]; then
     echo "ERROR: ${TEST_RESULTS_FILE} not found." >&2
     echo "  Run: GPU_TUNED_BUILD_TESTS=1 bash tuned/build.sh ${GPU_TUNED_VARIANT} && bash tuned/full_test.sh ${GPU_TUNED_VARIANT}" >&2
     exit 1
 fi
-if [[ "${INSTALLED_LIB}" -nt "${TEST_RESULTS_FILE}" ]]; then
-    echo "ERROR: ${INSTALLED_LIB} is newer than ${TEST_RESULTS_FILE} -- the test results predate the current build." >&2
+if [[ "${BUILT_LIB}" -nt "${TEST_RESULTS_FILE}" ]]; then
+    echo "ERROR: ${BUILT_LIB} is newer than ${TEST_RESULTS_FILE} -- the test results predate the current build." >&2
     echo "  Re-run tuned/full_test.sh ${GPU_TUNED_VARIANT} before publishing." >&2
     exit 1
 fi
@@ -114,6 +122,25 @@ if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then
     exit 1
 fi
 echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
+
+# libcuvs (and libcuvs_c) link kvikio, a CPM subproject that cuvs's own
+# install does not install. Without libkvikio.so in the tarball the release
+# loads only on a machine that still has this build tree (v26.10-gb10-cu133
+# and v26.12-gb10-cu134 shipped that way). Install it from its own generated
+# install script, the same technique tuned/build.sh uses for raft/rmm.
+if readelf -d "${INSTALLED_LIB}" | grep -q 'NEEDED.*libkvikio'; then
+    KVIKIO_INSTALL_SCRIPT="${LIBCUVS_BUILD_DIR}/_deps/kvikio-build/cmake_install.cmake"
+    if [[ ! -f "${KVIKIO_INSTALL_SCRIPT}" ]]; then
+        echo "ERROR: ${INSTALLED_LIB} needs libkvikio.so but ${KVIKIO_INSTALL_SCRIPT} is missing." >&2
+        echo "  Re-run tuned/build.sh ${GPU_TUNED_VARIANT}." >&2
+        exit 1
+    fi
+    echo "Bundling kvikio into ${INSTALL_PREFIX}..."
+    cmake -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -P "${KVIKIO_INSTALL_SCRIPT}"
+fi
+
+# Refuse to publish a package whose libraries need something it does not ship.
+bash "${REPODIR}/tuned/verify_bundled_deps.sh" "${INSTALL_PREFIX}" || exit 1
 
 DIST_DIR="${REPODIR}/dist/${GPU_TUNED_VARIANT}"
 rm -rf "${DIST_DIR}"
