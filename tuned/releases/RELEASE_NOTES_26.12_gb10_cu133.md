@@ -1,15 +1,11 @@
 # cuVS 26.12 — GB10 / DGX Spark Release Notes (CUDA 13.3)
 
-> DRAFT — not yet published. `tuned/package.sh` refuses to publish while this
-> line is present. Fill in every `_set at publish_` and `_pending_` value, then
-> delete this block.
-
-**Release Date**: _set at publish_
-**Package**: `libcuvs-26.12-gb10-cu133-g<short-sha>.tar.gz`
+**Release Date**: 2026-09-22
+**Package**: `libcuvs-26.12-gb10-cu133-g1c38fcf18.tar.gz`
 **Platform**: aarch64
 **GPU Architecture**: SM_121a (GB10 / DGX Spark, Grace Blackwell)
 **CUDA Toolkit**: 13.3.73 (CCCL 3.5.0)
-**Commit**: _set at publish_
+**Commit**: `1c38fcf18`
 
 ## Overview
 
@@ -84,9 +80,7 @@ is not covered by these tests.
 repositories is what stopped a `rapids_logger` version mismatch that broke
 cuVS's configure on 2026-09-08.
 
-**Bundled with this release:** _pending: the dependency versions recorded in
-the library's build-info stamp (kvikio, raft, rmm, rapids_logger) once
-`package.sh` has run_.
+**Bundled with this release:** kvikio 26.12.0, raft 26.12.0, rmm 26.12.0, rapids_logger 0.3.0 (as recorded in the library's build-info stamp).
 
 ## Full Test Suite Result
 
