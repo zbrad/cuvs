@@ -135,7 +135,12 @@ CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"  # e.g. cuvs-rtx50-cu132
 # HEAD, confirming both repos still configure cleanly against it, then
 # updating both files together in the same sitting -- never one without
 # the other, that's exactly the drift this exists to prevent.
-RAPIDS_CMAKE_PIN_SHA="8fc2d05e4b29a2fb7a355192ce19190fcf24c37f"
+# 2026-10-12: moved from 8fc2d05e (2026-09-08) to 61a96c8f, rapids-cmake's "Update cuco for
+# RoaringBitmap use in cuVS (#1095)". cuVS's roaring-bitmap CAGRA filter (#2446) calls
+# cuco::roaring_bitmap::from_indices, which the older pinned cuco lacks. Exactly two packages differ
+# between the two pins: cuco 4b26118c -> 8ed532dc, and CCCL (labelled 3.5.0 in both) 399863ef ->
+# b98d4bd6, so raft was rebuilt, retested and republished with the same pin.
+RAPIDS_CMAKE_PIN_SHA="61a96c8f29731affd7fd913a586673dd057dc3b0"
 
 # CUTILE_PYTHON: which interpreter cmake's generate_cutile_kernels.cmake
 # uses to import cuda.tile (the "cuTile Python" build dependency, see
