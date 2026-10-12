@@ -22,6 +22,8 @@
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
+#include <cuda/stream>
+
 #include <gtest/gtest.h>
 
 namespace cuvs::regression {
@@ -36,7 +38,7 @@ RAFT_KERNEL warp_reduce_add_op_kernel(const int* input, int* result)
 
 class WarpReduceAddOpTest : public testing::TestWithParam<std::vector<int>> {
  protected:
-  rmm::cuda_stream_view stream{rmm::cuda_stream_default};
+  cuda::stream_ref stream{cudaStream_t{cudaStreamDefault}};
   rmm::device_uvector<int> arr_d{GetParam().size(), stream};
 
  public:
@@ -47,8 +49,8 @@ class WarpReduceAddOpTest : public testing::TestWithParam<std::vector<int>> {
     rmm::device_scalar<int> result_d(stream);
     constexpr int block_dim = 64;
     constexpr int grid_dim  = 1;
-    warp_reduce_add_op_kernel<<<grid_dim, block_dim, 0, stream>>>(arr_d.data(), result_d.data());
-    stream.synchronize();
+    warp_reduce_add_op_kernel<<<grid_dim, block_dim, 0, stream.get()>>>(arr_d.data(), result_d.data());
+    stream.sync();
     RAFT_CUDA_TRY(cudaPeekAtLastError());
     // 64 threads in 2 warps of 32; each warp reduces its 32 elements via add_op.
     // Both warp leaders atomicAdd their sums → total equals sum of all 64 elements.
