@@ -30,9 +30,8 @@ set -e
 
 # resolve_raft_release <variant> <cuda_tag> — download + extract the
 # matching zbrad/raft tuned-builds release (see that repo's
-# tuned/package.sh/release.sh) into tuned/_raft_release/<variant>-<cuda_tag>/,
-# unless already present there. Prints the extracted root on stdout via the
-# RAFT_RELEASE_DIR variable set in the caller's scope.
+# tuned/package.sh/release.sh) into tuned/build/<cuda_tag>/raft/<tag>/, unless that tag is
+# already extracted there. Sets RAFT_RELEASE_TAG and RAFT_RELEASE_DIR in the caller's scope.
 #
 # Without this, cpp/cmake/thirdparty/get_raft.cmake's rapids_cpm_find(raft)
 # falls through to its default CPM behavior: git-clone rapidsai/raft's main
@@ -45,12 +44,6 @@ set -e
 # published release (see resolve_cuvs_release there).
 resolve_raft_release() {
     local variant="$1" cuda_tag="$2"
-    RAFT_RELEASE_DIR="${REPODIR}/tuned/_raft_release/${variant}-${cuda_tag}"
-
-    if [[ -n "$(find "${RAFT_RELEASE_DIR}" -maxdepth 4 -iname 'raft-config.cmake' 2>/dev/null)" ]]; then
-        echo "raft release already extracted: ${RAFT_RELEASE_DIR} (set FORCE_RAFT_DOWNLOAD=1 to re-fetch)"
-        [[ "${FORCE_RAFT_DOWNLOAD:-0}" != "1" ]] && return 0
-    fi
 
     echo "Looking up zbrad/raft tuned-builds release for ${variant}-${cuda_tag}..."
     local tag
@@ -77,6 +70,18 @@ resolve_raft_release() {
     fi
     echo "Found release: ${tag}"
 
+    # The extraction directory is named after the tag, under the per-toolkit tree, so a newer raft
+    # release is fetched instead of silently reusing an older extraction (the old fixed directory
+    # tuned/_raft_release/<variant>-<cuda_tag>/ was reused whatever the newest release was, which is
+    # how a cuvs build ends up paired with a raft it was never built against).
+    RAFT_RELEASE_TAG="${tag}"
+    RAFT_RELEASE_DIR="${GPU_TUNED_BUILD_ROOT}/raft/${tag}"
+    if [[ -n "$(find "${RAFT_RELEASE_DIR}" -maxdepth 4 -iname 'raft-config.cmake' 2>/dev/null)" && "${FORCE_RAFT_DOWNLOAD:-0}" != "1" ]]; then
+        echo "raft release ${tag} already extracted: ${RAFT_RELEASE_DIR} (set FORCE_RAFT_DOWNLOAD=1 to re-fetch)"
+        return 0
+    fi
+
+    [[ "${RAFT_RELEASE_DIR}" == "${REPODIR}/tuned/build/"*/raft/* ]] || { echo "ERROR: unexpected raft release dir ${RAFT_RELEASE_DIR}" >&2; exit 1; }
     rm -rf "${RAFT_RELEASE_DIR}"
     mkdir -p "${RAFT_RELEASE_DIR}"
     local dl_dir
@@ -149,6 +154,8 @@ RAPIDS_CMAKE_PIN_SHA="8fc2d05e4b29a2fb7a355192ce19190fcf24c37f"
 CUTILE_PYTHON="$(command -v python3)"
 
 resolve_raft_release "${GPU_TUNED_VARIANT}" "${CUDA_TAG}"
+# Record which raft this was built against in the build-info stamp ("deps" field).
+export GPU_TUNED_BUILD_INFO_DEPS="raft ${RAFT_RELEASE_TAG} https://github.com/zbrad/raft/releases/tag/${RAFT_RELEASE_TAG}"
 
 echo "===================================================="
 echo "cuVS ${GPU_TUNED_DEVICE_LABEL} Build"
