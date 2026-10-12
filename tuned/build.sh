@@ -169,6 +169,14 @@ echo ""
 # shared basename; REPODIR keeps the two unambiguous).
 echo "Cleaning previous build artifacts..."
 cd "$REPODIR"
+# Upstream's clean deletes whatever LIBCUVS_BUILD_DIR names, and falls back to cpp/build when it is
+# unset -- which would wipe the old-layout outputs that live there. Point it at this build's own
+# compile tree first (exported, so the child build.sh sees it), so only that tree is cleaned.
+export LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-"$(gpu_tuned_out_dir build "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"}"
+[[ "${LIBCUVS_BUILD_DIR}" == "${REPODIR}/tuned/build/"* ]] || {
+    echo "ERROR: LIBCUVS_BUILD_DIR=${LIBCUVS_BUILD_DIR} is outside tuned/build/; refusing to let upstream's clean delete it." >&2
+    exit 1
+}
 ./build.sh clean
 
 echo "Starting lib${CUVS_LIB_NAME} build for ${GPU_TUNED_HW_LABEL}..."
@@ -177,6 +185,14 @@ echo ""
 LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-"$(gpu_tuned_out_dir build "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-${PREFIX:-${CONDA_PREFIX:-${LIBCUVS_BUILD_DIR}/install}}}"
 PARALLEL_LEVEL="${PARALLEL_LEVEL:-$(nproc)}"
+
+gpu_tuned_assert_cmake_cache_consistent "${LIBCUVS_BUILD_DIR}" || exit 1
+# Timing: ninja appends to its log across runs, so only what lands after this point is this build.
+NINJA_LOG="${LIBCUVS_BUILD_DIR}/.ninja_log"
+NINJA_OFFSET=0
+[[ -f "${NINJA_LOG}" ]] && NINJA_OFFSET="$(wc -c < "${NINJA_LOG}")"
+BUILD_T0="${EPOCHSECONDS}"
+ccache -z >/dev/null 2>&1 || true
 
 # Use ccache as the compiler launcher when available -- a cold cache gets
 # no benefit (this build's own header-heavy CUTLASS/raft templates make a
@@ -274,6 +290,16 @@ if [[ "${GPU_TUNED_BUILD_TESTS:-OFF}" == "ON" ]]; then
 else
   cmake --build "${LIBCUVS_BUILD_DIR}" -j"${PARALLEL_LEVEL}" --target cuvs cuvs_c install
 fi
+
+echo ""
+echo "Build timing (wall $(( EPOCHSECONDS - BUILD_T0 ))s):"
+if [[ -f "${NINJA_LOG}" ]] && gpu_tuned_ninja_timing "${NINJA_LOG}" "${NINJA_OFFSET}" "${GPU_TUNED_BUILD_ROOT}/timing.tsv" "CMakeFiles/"; then
+    echo "  per-target timings: ${GPU_TUNED_BUILD_ROOT}/timing.tsv"
+else
+    echo "  (no per-target timings: nothing was rebuilt, or ninja logged nothing)"
+fi
+command -v ccache >/dev/null 2>&1 && echo "ccache: $(ccache -s | grep -E 'Hits:|Misses:' | head -2 | tr -s ' ' | tr '\n' ' ')"
+echo ""
 
 # cuvs-config.cmake (installed above) exports cuvs::cuvs with a link
 # interface that references raft::raft and rmm::rmm as real CMake
