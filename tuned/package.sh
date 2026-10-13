@@ -144,20 +144,12 @@ for so in librmm.so librapids_logger.so libkvikio.so libcuvs_c.so; do
     fi
 done
 KEEP_RE="^lib(${CUVS_LIB_NAME}|raft-${GPU_TUNED_VARIANT}-${CUDA_TAG})\\.so\$"
-gpu_tuned_rename_sonames "${STAGE}/lib" "${OURS_MANIFEST}" "${KEEP_RE}" | sed 's/^/  /'
+# Renames, repoints the installed CMake and pkg-config files, then fails closed: every shared object
+# is renamed or kept, every DT_NEEDED resolves in the tree or is a toolkit/system library.
+gpu_tuned_rename_package "${STAGE}/lib" "${OURS_MANIFEST}" - "${KEEP_RE}" \
+    '^(linux-vdso\.so|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread\.so|librt\.so|libgcc_s\.so|libstdc\+\+\.so|libgomp\.so|libcuda\.so|libcudart\.so|libcublas\.so|libcublasLt\.so|libcusolver\.so|libcusparse\.so|libcurand\.so|libcufft\.so|libnvrtc\.so|libnvJitLink\.so|libnvtx|libcufile\.so)' \
+    "${STAGE}/lib/cmake" "${STAGE}/lib/pkgconfig" || exit 1
 rm -f "${OURS_MANIFEST}"
-for so in librmm librapids_logger libkvikio libcuvs_c; do
-    # files naming a renamed library (CMake import files, pkg-config); \b-free: the .so suffix is the anchor
-    (grep -rlE "${so}\\.so" "${STAGE}/lib/cmake" "${STAGE}/lib/pkgconfig" 2>/dev/null || true) | while IFS= read -r cf; do
-        sed -i -E "s#${so}\\.so#${so}${GPU_TUNED_SO_MARK}.so#g" "${cf}"
-    done
-done
-if grep -rE 'lib(rmm|rapids_logger|kvikio|cuvs_c)\.so' "${STAGE}/lib/cmake" "${STAGE}/lib/pkgconfig" >/dev/null 2>&1; then
-    echo "ERROR: CMake/pkg-config files still name an unmarked shared object." >&2
-    exit 1
-fi
-# fail closed: every shared object is tuned or kept, every DT_NEEDED resolves in the tree or is a toolkit/system library
-gpu_tuned_verify_unique_sonames "${STAGE}/lib" - "${KEEP_RE}" '^(linux-vdso\.so|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread\.so|librt\.so|libgcc_s\.so|libstdc\+\+\.so|libgomp\.so|libcuda\.so|libcudart\.so|libcublas\.so|libcublasLt\.so|libcusolver\.so|libcusparse\.so|libcurand\.so|libcufft\.so|libnvrtc\.so|libnvJitLink\.so|libnvtx|libcufile\.so)' || exit 1
 # patchelf rewrote the files; the build-info stamp on the cuvs lib must have survived
 gpu_tuned_verify_build_info "${STAGE}/lib/lib${CUVS_LIB_NAME}.so" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" || exit 1
 
