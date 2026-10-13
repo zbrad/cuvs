@@ -271,6 +271,13 @@ if [[ "${GPU_TUNED_BUILD_MG_ALGOS}" == "ON" ]]; then
     )
 fi
 
+# Unique shared-object identities at build time: the fetched kvikio and our own cuvs_c get OUTPUT_NAME
+# <name>-tuned through a CMake include (no upstream source is edited), so the build tree, the install
+# tree, every DT_NEEDED and the CMake export files all carry the names we ship. librmm and
+# librapids_logger arrive already renamed in the raft release (zbrad/raft builds them that way).
+SO_NAMES_CMAKE="${GPU_TUNED_BUILD_ROOT}/so_names.cmake"
+gpu_tuned_so_names_cmake "${SO_NAMES_CMAKE}" || exit 1
+
 mkdir -p "${LIBCUVS_BUILD_DIR}"
 
 cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
@@ -291,6 +298,8 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}" \
   "-DCMAKE_PREFIX_PATH=${RAFT_RELEASE_DIR}" \
   "-Drapids-cmake-sha=${RAPIDS_CMAKE_PIN_SHA}" \
+  "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=${SO_NAMES_CMAKE}" \
+  "-DTUNED_SO_TARGETS=kvikio;cuvs_c" \
   "-DPython_EXECUTABLE=${CUTILE_PYTHON}" \
   "${CMAKE_LAUNCHER_ARGS[@]}" \
   "${NCCL_CMAKE_ARGS[@]}"
@@ -395,6 +404,10 @@ else
     done
     unset _dep _dep_install_script
 fi
+
+# The renamed libraries must have reached the install tree (the build-time rename took effect).
+[[ -f "${INSTALL_PREFIX}/lib/libcuvs_c-tuned.so" ]] || { echo "ERROR: install produced no libcuvs_c-tuned.so under ${INSTALL_PREFIX}/lib (the build-time rename did not take effect)" >&2; exit 1; }
+[[ -f "${LIBCUVS_BUILD_DIR}/_deps/kvikio-build/libkvikio-tuned.so" ]] || { echo "ERROR: no libkvikio-tuned.so in ${LIBCUVS_BUILD_DIR}/_deps/kvikio-build (the build-time rename did not take effect)" >&2; exit 1; }
 
 # Verify output
 LIBDIR="${LIBCUVS_BUILD_DIR}"
