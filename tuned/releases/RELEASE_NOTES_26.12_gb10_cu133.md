@@ -1,92 +1,57 @@
 # cuVS 26.12 — GB10 / DGX Spark Release Notes (CUDA 13.3)
 
-**Release Date**: 2026-09-22
-**Package**: `libcuvs-26.12-gb10-cu133-g1c38fcf18.tar.gz`
+**Release Date**: 2026-10-12
+**Package**: `libcuvs-26.12-gb10-cu133-g<commit>.tar.gz` (`<commit>` is the 8-hex suffix of this release's tag)
 **Platform**: aarch64
 **GPU Architecture**: SM_121a (GB10 / DGX Spark, Grace Blackwell)
 **CUDA Toolkit**: 13.3.73 (CCCL 3.5.0)
-**Commit**: `1c38fcf18`
+**Commit**: the tag's `-g<commit>` suffix; `git log --oneline` from it shows exactly what is in this release
 
 ## Overview
 
-The 26.12 source line of cuVS built against CUDA 13.3, single-arch for
-`sm_121a`, as `libcuvs-gb10-cu133.so`. It links the published RAFT release
-`v26.12-gb10-cu133-g9fcf3a1f` (see "Depends on RAFT" below) and bundles
-`kvikio`, which cuVS's own install does not ship.
+The same cuVS source as the CUDA 13.4 release `v26.12-gb10-cu134-g34e6199d`, built against CUDA 13.3
+instead of 13.4, single-arch for `sm_121a`, as `libcuvs-gb10-cu133.so`, for consumers that have not
+moved to the 13.4 toolkit. The full list of changes (upstream sync to `NVIDIA/cuvs` `main` at
+`24b0b1706`, rapids-cmake pin `61a96c8f`, the unique `-tuned` shared-object names, the fixed
+regression test, the package/release split) is in `RELEASE_NOTES_26.12_gb10_cu134.md`. It supersedes
+`v26.12-gb10-cu133-g1c38fcf18` (2026-09-22), which shipped the stock RAPIDS library names.
 
-**Upstream base.** This is a development build: `tuned-builds` is merged with
-upstream `NVIDIA/cuvs` `main` as of `411d4129d` (2026-09-21), version 26.12.00, which
-upstream has not tagged. Upstream's latest tagged release is `v26.08.01`; its
-`release/26.10` branch exists but is not yet tagged. Every fork-only change is
-listed in `tuned/docs/FORK_PATCHES.md`.
+**Shared objects renamed.** This package ships `librmm-tuned.so`, `librapids_logger-tuned.so`,
+`libkvikio-tuned.so` and `libcuvs_c-tuned.so` instead of the stock names; `libcuvs-gb10-cu133.so`
+and `libraft-gb10-cu133.so` keep theirs. **Breaking** for anything that loaded the old names from an
+earlier cuVS release; rebuild such consumers (zbrad/faiss) against this one.
 
-**Changes relative to upstream** (everything else is upstream's code):
-- **sm_121 cuTile smoke-test fragment.** GB10 rejects the `sm_120` cubin as
-  forward-compatible, so we add a `cutile_arch_12_1` tag, an `sm_121` entry in
-  the cuTile *smoke-test* matrix, and a `CutileSmoke` canary that turns the
-  driver's missing JIT compiler into a skip. Submitted upstream as
-  [`NVIDIA/cuvs#2568`](https://github.com/NVIDIA/cuvs/pull/2568), still open.
-  This does **not** add `sm_121` to the production cuTile top-1 nearest-neighbor
-  kernels: their matrix (`fused_1nn_cutile_matrix.json`) is identical to
-  upstream's and has no `sm_121` entry.
-- **`NNTest` skip guard** in `cpp/tests/neighbors/distance_nn.cu`: an
-  `IsSkipped()` check so upstream's `GTEST_SKIP()` in a helper actually skips
-  the test. Reported upstream as
-  [`NVIDIA/cuvs#2660`](https://github.com/NVIDIA/cuvs/issues/2660), open.
-- **`CUVS_OUTPUT_NAME`** CMake option so the library is named
-  `libcuvs-gb10-cu133.so`.
-- **Regression test** `REGRESSION_TEST` for the `warpReduce`/`add_op`
-  ambiguity, with a write-up in `docs/fixes/`. The fix itself is already
-  upstream; the test guards against it regressing.
-- **Build-config fixes in the C tests:** `MG_C_TEST` is only configured when
-  `BUILD_MG_ALGOS` is on, and the C header check uses the right source root.
-- **Repository files:** `.gitattributes` (LF line endings) and `.gitignore`.
-- **`tuned/` build, test, package and release tooling.**
-
-The **Driver Context** section records which NVIDIA drivers exist for GB10 and
-what is and is not known about their memory behavior; the cuTile tests in this
-release are skipped because of the driver (see "Test Skips").
+Fork-only changes are listed in `tuned/docs/FORK_PATCHES.md`; the changes carried over from the
+earlier CUDA 13.3 release are those described there.
 
 ## Depends on RAFT
 
-**Paired RAFT release.** This cuVS was built and tested against the published
-RAFT release
-[`v26.12-gb10-cu133-g9fcf3a1f`](https://github.com/zbrad/raft/releases/tag/v26.12-gb10-cu133-g9fcf3a1f)
-(RAFT 26.12, CUDA 13.3.73, CCCL 3.5.0, `sm_121a`; 16/16 RAFT gtest binaries
-passed). `tuned/build.sh` downloads and extracts that release, so the build
-does not compile RAFT from source.
+This cuVS was built and tested against the published RAFT release
+[`v26.12-gb10-cu133-g680788c8`](https://github.com/zbrad/raft/releases/tag/v26.12-gb10-cu133-g680788c8)
+(RAFT 26.12, CUDA 13.3.73, CCCL 3.5.0, `sm_121a`; 16/16 RAFT gtest binaries). `tuned/build.sh`
+downloads and extracts that release, so the build does not compile RAFT from source. cuVS does not
+pin a RAFT commit; it requires RAFT at its own RAPIDS major.minor, so compatibility comes from these
+paired, tested releases (recorded in `tuned/docs/RELEASE_PINS.md`). A RAFT built from a different
+RAPIDS version, a different CUDA toolkit, or without the same library names is not covered.
 
-**How upstream cuVS pins RAFT.** cuVS does not pin a RAFT commit or release.
-Its `get_raft.cmake` requires RAFT at cuVS's own RAPIDS major.minor
-(`find_package(raft <major.minor>)`), so any installed RAFT with the same
-major.minor satisfies it. If none is found, CMake clones `rapidsai/raft` at the
-branch named in cuVS's `RAPIDS_BRANCH` file:
+Both builds resolve `rapids-cmake`
+[`61a96c8f`](https://github.com/rapidsai/rapids-cmake/commit/61a96c8f29731affd7fd913a586673dd057dc3b0)
+(`-Drapids-cmake-sha`).
 
-| cuVS source | RAFT it expects |
-|---|---|
-| upstream `v26.08.01` (latest upstream release) | 26.08, branch `release/26.08` |
-| upstream `release/26.10` | 26.10, branch `release/26.10` |
-| upstream `main` and `zbrad/cuvs` `tuned-builds` | 26.12, branch `main` |
-
-The version check only compares major.minor, so compatibility comes from our
-paired, tested releases, recorded for every release in
-`tuned/docs/RELEASE_PINS.md`. Use this cuVS with the RAFT release above. A
-RAFT built from a different RAPIDS version or against a different CUDA toolkit
-is not covered by these tests.
-
-**Shared build pins.** Both builds resolve the same `rapids-cmake` commit
-[`8fc2d05e`](https://github.com/rapidsai/rapids-cmake/commit/8fc2d05e4b29a2fb7a355192ce19190fcf24c37f)
-(`-Drapids-cmake-sha`), which also fixes CCCL at 3.5.0. Pinning it in both
-repositories is what stopped a `rapids_logger` version mismatch that broke
-cuVS's configure on 2026-09-08.
-
-**Bundled with this release:** kvikio 26.12.0, raft 26.12.0, rmm 26.12.0, rapids_logger 0.3.0 (as recorded in the library's build-info stamp).
+**Bundled with this release:** kvikio 26.10.0, raft 26.12.0, rmm 26.10.0, rapids_logger 0.3.0 (read
+from each bundled package's version file, recorded in the library's build-info stamp).
 
 ## Full Test Suite Result
 
-**35/35** gtest binaries passed (`tuned/full_test.sh`, 2026-09-21, on the merged tree).
-Full output attached as `TEST_RESULTS_gb10.log` on this release. One
-known-flaky case is excluded from the gate (below).
+**37/37 gtest binaries passed, 0 failed; 12,476 tests passed, 2,702 skipped** (`tuned/full_test.sh`,
+started 03:42Z, finished 04:19Z on 2026-10-13, 37 minutes, one binary at a time). Full output
+attached as `TEST_RESULTS_gb10.log` on this release. One known-flaky case is excluded from the gate:
+`KmeansFitBatchedTestF.Result/4` ([`NVIDIA/cuvs#2657`](https://github.com/NVIDIA/cuvs/issues/2657),
+open); it is run once and recorded, and passed this run. The counts equal the CUDA 13.4 build's.
+
+Build timing, cold ccache for this toolkit: wall 1,131 s with `-j20`, 7,052 timed units (summed unit
+time 20,528 s), ccache 0 of 2,234 hits.
+
 
 ## Test Skips and Known Issues
 
@@ -298,15 +263,15 @@ launch has not been tested.
 
 ```
 git clone git@github.com:zbrad/cuvs.git && cd cuvs
-git checkout <commit>
-CUDA_VER=13.3 GPU_TUNED_BUILD_TESTS=1 bash tuned/build.sh gb10   # fetches the RAFT release above
-CUDA_VER=13.3 bash tuned/full_test.sh gb10                       # must pass before packaging
-CUDA_VER=13.3 bash tuned/package.sh gb10
+git checkout <the release tag>
+export CUDA_VER=13.3
+GPU_TUNED_BUILD_TESTS=ON bash tuned/build.sh gb10   # fetches the RAFT release above
+bash tuned/full_test.sh gb10                        # must pass before packaging
+bash tuned/package.sh gb10                          # builds the tarball
+bash tuned/release.sh gb10                          # publishes, after the gates
 ```
 
-Outputs go to CUDA-version-specific directories so a cu133 and a cu134 build
-never share files: `cpp/build/cu133/gb10/`, `dist/cu133/gb10/` and
-`tuned/releases/cu133/`.
+Outputs go to one tree per toolkit, `tuned/build/cu133/`, so a cu133 and a cu134 build never share
+files.
 
-See `tuned/docs/RELEASE_PINS.md` for the pairing and `rapids-cmake` pin of
-every release.
+See `tuned/docs/RELEASE_PINS.md` for the pairing and `rapids-cmake` pin of every release.
