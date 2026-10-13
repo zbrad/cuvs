@@ -45,8 +45,19 @@ set -e
 resolve_raft_release() {
     local variant="$1" cuda_tag="$2"
 
-    echo "Looking up zbrad/raft tuned-builds release for ${variant}-${cuda_tag}..."
     local tag
+    if [[ -n "${RAFT_RELEASE_TARBALL:-}" ]]; then
+        # Use a raft tarball built locally by raft's tuned/package.sh before it is published
+        # (raft/tuned/build/<cuda>/dist/raft-<ver>-<variant>-<cuda>-g<sha>.tar.bz2). The tag is
+        # derived from the file name and is recorded as unpublished in the build-info stamp.
+        [[ -f "${RAFT_RELEASE_TARBALL}" ]] || { echo "ERROR: RAFT_RELEASE_TARBALL=${RAFT_RELEASE_TARBALL} does not exist." >&2; exit 1; }
+        tag="$(basename "${RAFT_RELEASE_TARBALL}" .tar.bz2)"
+        [[ "${tag}" =~ ^raft-.+-${variant}-${cuda_tag}-g[0-9a-f]+$ ]] || { echo "ERROR: ${tag} does not look like a raft ${variant}-${cuda_tag} package name." >&2; exit 1; }
+        tag="v${tag#raft-}"
+        RAFT_RELEASE_LOCAL=1
+        echo "Using local, unpublished raft package: ${RAFT_RELEASE_TARBALL}"
+    else
+    echo "Looking up zbrad/raft tuned-builds release for ${variant}-${cuda_tag}..."
     # raft now publishes v<ver>-<variant>-<cuda_tag>[-g<short-sha>], the
     # same order as this repo's own release tags -- match the same way
     # faiss matches cuvs's tags. (Was variant-suffix-only, back when
@@ -69,6 +80,7 @@ resolve_raft_release() {
         exit 1
     fi
     echo "Found release: ${tag}"
+    fi
 
     # The extraction directory is named after the tag, under the per-toolkit tree, so a newer raft
     # release is fetched instead of silently reusing an older extraction (the old fixed directory
@@ -76,7 +88,7 @@ resolve_raft_release() {
     # how a cuvs build ends up paired with a raft it was never built against).
     RAFT_RELEASE_TAG="${tag}"
     RAFT_RELEASE_DIR="${GPU_TUNED_BUILD_ROOT}/raft/${tag}"
-    if [[ -n "$(find "${RAFT_RELEASE_DIR}" -maxdepth 4 -iname 'raft-config.cmake' 2>/dev/null)" && "${FORCE_RAFT_DOWNLOAD:-0}" != "1" ]]; then
+    if [[ -n "$(find "${RAFT_RELEASE_DIR}" -maxdepth 4 -iname 'raft-config.cmake' 2>/dev/null)" && "${FORCE_RAFT_DOWNLOAD:-0}" != "1" && "${RAFT_RELEASE_LOCAL:-0}" != "1" ]]; then
         echo "raft release ${tag} already extracted: ${RAFT_RELEASE_DIR} (set FORCE_RAFT_DOWNLOAD=1 to re-fetch)"
         return 0
     fi
@@ -86,9 +98,13 @@ resolve_raft_release() {
     mkdir -p "${RAFT_RELEASE_DIR}"
     local dl_dir
     dl_dir="$(mktemp -d)"
-    gh release download "${tag}" --repo zbrad/raft --pattern '*.tar.bz2' --dir "${dl_dir}"
     local tarball
-    tarball="$(ls "${dl_dir}"/*.tar.bz2 | head -1)"
+    if [[ -n "${RAFT_RELEASE_TARBALL:-}" ]]; then
+        tarball="${RAFT_RELEASE_TARBALL}"
+    else
+        gh release download "${tag}" --repo zbrad/raft --pattern '*.tar.bz2' --dir "${dl_dir}"
+        tarball="$(ls "${dl_dir}"/*.tar.bz2 | head -1)"
+    fi
     [[ -z "${tarball}" ]] && { echo "ERROR: release ${tag} has no .tar.bz2 asset." >&2; exit 1; }
     # --strip-components=1: unlike this repo's own tarball (flat, tar -C
     # <prefix> -czf ... . in tuned/package.sh here), raft's tuned/package.sh
@@ -160,7 +176,11 @@ CUTILE_PYTHON="$(command -v python3)"
 
 resolve_raft_release "${GPU_TUNED_VARIANT}" "${CUDA_TAG}"
 # Record which raft this was built against in the build-info stamp ("deps" field).
-export GPU_TUNED_BUILD_INFO_DEPS="raft ${RAFT_RELEASE_TAG} https://github.com/zbrad/raft/releases/tag/${RAFT_RELEASE_TAG}"
+if [[ "${RAFT_RELEASE_LOCAL:-0}" == "1" ]]; then
+    export GPU_TUNED_BUILD_INFO_DEPS="raft ${RAFT_RELEASE_TAG} (local, unpublished)"
+else
+    export GPU_TUNED_BUILD_INFO_DEPS="raft ${RAFT_RELEASE_TAG} https://github.com/zbrad/raft/releases/tag/${RAFT_RELEASE_TAG}"
+fi
 
 echo "===================================================="
 echo "cuVS ${GPU_TUNED_DEVICE_LABEL} Build"
