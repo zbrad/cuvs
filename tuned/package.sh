@@ -156,6 +156,17 @@ gpu_tuned_verify_build_info "${STAGE}/lib/lib${CUVS_LIB_NAME}.so" "cuvs" "${CUVS
 # Refuse to publish a package whose libraries need something it does not ship.
 bash "${REPODIR}/tuned/verify_bundled_deps.sh" "${STAGE}" || exit 1
 
+# Self-containment gates. A package whose installed CMake files ask for nvtx3 must ship it (config and
+# headers): found in a pip wheel instead of fetched, it is silently left out and consumers (faiss) fail
+# to configure. Then prove it the way a consumer would: configure a minimal project against this
+# package alone and require nvtx3, rmm and rapids_logger to resolve inside it.
+if grep -rqE 'find_dependency\(nvtx3' "${STAGE}/lib/cmake" 2>/dev/null; then
+    if ! compgen -G "${STAGE}/lib*/cmake/nvtx3/nvtx3-config.cmake" >/dev/null || [[ ! -f "${STAGE}/include/nvtx3/nvtx3.hpp" ]]; then
+        echo "ERROR: the CMake files in this package require nvtx3 but it does not ship its config and headers; it was found outside the build (a pip wheel?) instead of fetched. That copy is not the tuned, tested one." >&2
+        exit 1
+    fi
+fi
+gpu_tuned_verify_consumer_configure "${STAGE}" rmm raft cuvs || exit 1
 DIST_DIR="$(gpu_tuned_out_dir dist "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"

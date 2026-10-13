@@ -275,6 +275,9 @@ fi
 # <name>-tuned through a CMake include (no upstream source is edited), so the build tree, the install
 # tree, every DT_NEEDED and the CMake export files all carry the names we ship. librmm and
 # librapids_logger arrive already renamed in the raft release (zbrad/raft builds them that way).
+# Pip wheels in the user site-packages ship CMake packages (nvtx3, rmm ...) that CMake would find
+# instead of fetching them, so they would not be installed with our package. They are ignored.
+gpu_tuned_warn_pip_cmake_packages
 SO_NAMES_CMAKE="${GPU_TUNED_BUILD_ROOT}/so_names.cmake"
 gpu_tuned_so_names_cmake "${SO_NAMES_CMAKE}" || exit 1
 
@@ -300,9 +303,16 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   "-Drapids-cmake-sha=${RAPIDS_CMAKE_PIN_SHA}" \
   "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=${SO_NAMES_CMAKE}" \
   "-DTUNED_SO_TARGETS=kvikio;cuvs_c" \
+  "-DCMAKE_IGNORE_PREFIX_PATH=$(gpu_tuned_cmake_ignore_pip_prefixes)" \
+  -Unvtx3_DIR \
   "-DPython_EXECUTABLE=${CUTILE_PYTHON}" \
   "${CMAKE_LAUNCHER_ARGS[@]}" \
   "${NCCL_CMAKE_ARGS[@]}"
+
+# Nothing the configure resolved may come from a pip wheel: it would not be the tested copy and would be
+# missing from the package (nvtx3 comes from the raft release this build links; see
+# gpu_tuned_verify_no_pip_cmake_deps).
+gpu_tuned_verify_no_pip_cmake_deps "${LIBCUVS_BUILD_DIR}/CMakeCache.txt" || exit 1
 
 # Surface which raft this configure actually resolved. As of
 # resolve_raft_release above, this is now zbrad/raft's own published tuned
