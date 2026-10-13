@@ -10,7 +10,7 @@
 ## Overview
 
 The 26.12 source line of cuVS built against CUDA 13.4, single-arch for `sm_121a`, as
-`libcuvs-gb10-cu134.so`. It links the published RAFT release `v26.12-gb10-cu134-g6ddfdeae` and
+`libcuvs-gb10-cu134.so`. It links the published RAFT release `v26.12-gb10-cu134-g0fa8a51f` and
 bundles `kvikio`, which cuVS's own install does not ship.
 
 **Upstream base.** `tuned-builds` is merged with upstream `NVIDIA/cuvs` `main` at `24b0b1706`
@@ -33,6 +33,14 @@ in `RELEASE_NOTES_26.12_gb10_cu133.md`.
   names from an earlier cuVS release; rebuild such consumers (zbrad/faiss) against this one.
   The libraries under test were built against the renamed RAFT, so they link the `-tuned` names
   directly.
+- **nvtx3 is now shipped.** The previous packages did not contain nvtx3 although their installed
+  `rmm-dependencies.cmake` calls `find_dependency(nvtx3)`: the builds had resolved nvtx3 from a stock pip
+  `librmm` wheel in the build host's user site-packages, so it was never fetched or installed, and a
+  consumer configured against the package alone (zbrad/faiss) failed. The build now ignores user-site pip
+  CMake packages and the RAFT release it links ships nvtx3 (`lib/cmake/nvtx3/`, `include/nvtx3/`, 3.2.0,
+  header-only). The build fails if any `*_DIR` in its CMake cache points into a pip wheel, and packaging
+  fails unless nvtx3 is in the package and a minimal consumer project configures against it with `nvtx3`,
+  `rmm`, `rapids_logger` and `raft` resolving inside it. A stock wheel's nvtx3 is not the tuned, tested copy.
 - **Shared rapids-cmake pin moved `8fc2d05e` -> `61a96c8f`**, the same pin as RAFT. The merged
   roaring-bitmap filter calls `cuco::roaring_bitmap::from_indices`, which the older pinned cuco
   lacks, so cuVS did not compile against the old pin.
@@ -50,14 +58,12 @@ in `RELEASE_NOTES_26.12_gb10_cu133.md`.
 ## Depends on RAFT
 
 This cuVS was built and tested against the RAFT package
-[`v26.12-gb10-cu134-g6ddfdeae`](https://github.com/zbrad/raft/releases/tag/v26.12-gb10-cu134-g6ddfdeae)
-(RAFT 26.12, CUDA 13.4, CCCL 3.5.0, `sm_121a`; 16/16 RAFT gtest binaries). The build used the
-pre-publication copy of that package, `g25f763e8`: the same libraries, differing only in the
-commit recorded in the build-info stamp. `tuned/build.sh` extracts a RAFT package instead of
-compiling RAFT from source. cuVS does not pin a RAFT commit; it requires RAFT at its own RAPIDS
-major.minor, so compatibility comes from these paired, tested releases (recorded in
-`tuned/docs/RELEASE_PINS.md`). A RAFT built from a different RAPIDS version, a different CUDA
-toolkit, or without the same library names is not covered.
+[`v26.12-gb10-cu134-g0fa8a51f`](https://github.com/zbrad/raft/releases/tag/v26.12-gb10-cu134-g0fa8a51f)
+(RAFT 26.12, CUDA 13.4, CCCL 3.5.0, `sm_121a`; 16/16 RAFT gtest binaries), the published release itself.
+`tuned/build.sh` extracts a RAFT package instead of compiling RAFT from source. cuVS does not pin a RAFT
+commit; it requires RAFT at its own RAPIDS major.minor, so compatibility comes from these paired, tested
+releases (recorded in `tuned/docs/RELEASE_PINS.md`). A RAFT built from a different RAPIDS version, a
+different CUDA toolkit, or without the same library names and nvtx3 is not covered.
 
 Both builds resolve `rapids-cmake`
 [`61a96c8f`](https://github.com/rapidsai/rapids-cmake/commit/61a96c8f29731affd7fd913a586673dd057dc3b0)
@@ -69,7 +75,7 @@ Both builds resolve `rapids-cmake`
 ## Full Test Suite Result
 
 **37/37 gtest binaries passed, 0 failed; 12,476 tests passed, 2,702 skipped** (`tuned/full_test.sh`,
-started 00:27Z, finished 01:04Z on 2026-10-13, 37 minutes, one binary at a time), against the
+started 21:37Z, finished 22:14Z on 2026-10-13, 37 minutes, one binary at a time, on commit `075bc636`), against the
 `-tuned`-named libraries. Full output attached as `TEST_RESULTS_gb10.log` on this release. One
 known-flaky case is excluded from the gate: `KmeansFitBatchedTestF.Result/4`
 ([`NVIDIA/cuvs#2657`](https://github.com/NVIDIA/cuvs/issues/2657), open); it is run once and
@@ -82,8 +88,8 @@ those notes).
 
 ## Build Timing
 
-Cold-ish build with tests on: wall 1,080 s with `-j20`, 7,052 timed units (summed unit time
-20,004 s), ccache 179 of 2,234 hits (8%). The hit rate is low because the pin move invalidated the
+Cold-ish build with tests on: wall 1,085 s with `-j20`, 7,052 timed units (summed unit time
+19,894 s), ccache 179 of 2,234 hits (8%). The hit rate is low because the pin move invalidated the
 cache and the JIT-LTO `generated_kernels` objects cannot be cached. Per-unit timings are in
 `tuned/build/cu134/timing.tsv` on the build host.
 
