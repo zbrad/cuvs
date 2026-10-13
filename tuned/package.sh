@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # tuned/package.sh <variant> — package an already-built (tuned/build.sh
-# <variant>) cmake-install tree into a tarball and publish it as a real
-# GitHub release, so downstream C++ consumers (zbrad/faiss) can pull a
+# <variant>) cmake-install tree into a tarball (with unique shared-object
+# identities; see below). Publishing is a separate step, tuned/release.sh,
+# so the tarball can be used locally first. Downstream C++ consumers (zbrad/faiss) can pull a
 # published cuVS build instead of reaching into a local sibling checkout.
 #
 # Not a Python wheel (unlike raft/flashinfer/pytorch's tuned/wheel.sh) --
@@ -18,7 +19,7 @@
 #
 # Usage:
 #   bash tuned/build.sh rtx50      # first, produces the install tree
-#   bash tuned/package.sh rtx50    # then, packages + publishes it
+#   bash tuned/package.sh rtx50    # then, packages it; tuned/release.sh publishes
 set -euo pipefail
 
 REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -71,50 +72,6 @@ fi
 gpu_tuned_verify_arch "${INSTALLED_LIB}" "${GPU_TUNED_CUDA_ARCH}" || exit 1
 gpu_tuned_verify_cuda_compat "${INSTALLED_LIB}" "${CUDA_VER}" || exit 1
 
-# Publish gate: refuse without a fresh, passing full-test-suite run.
-# "Fresh" = newer than the built .so, not just present -- a stale pass
-# from before the last code change would otherwise silently satisfy this
-# check. See tuned/full_test.sh (GPU_TUNED_BUILD_TESTS=1 rebuild
-# required first -- this repo's default build skips tests entirely),
-# which writes this file and is the only thing that should.
-#
-# Compare against the BUILD-TREE library (what the test binaries link), not
-# INSTALLED_LIB: embed_build_info below rewrites INSTALLED_LIB (objcopy) on
-# every packaging run, so its mtime moves past the test results and the gate
-# would pass only once per test run. Same approach as zbrad/raft's release.sh.
-TEST_RESULTS_FILE="$(gpu_tuned_out_dir releases "${REPODIR}" "${CUDA_TAG}")/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
-BUILT_LIB="${LIBCUVS_BUILD_DIR}/lib${CUVS_LIB_NAME}.so"
-if [[ ! -f "${BUILT_LIB}" ]]; then
-    echo "ERROR: ${BUILT_LIB} not found -- cannot tell whether the test results are fresh." >&2
-    echo "  Run 'bash tuned/build.sh ${GPU_TUNED_VARIANT}' first." >&2
-    exit 1
-fi
-if [[ ! -f "${TEST_RESULTS_FILE}" ]]; then
-    echo "ERROR: ${TEST_RESULTS_FILE} not found." >&2
-    echo "  Run: GPU_TUNED_BUILD_TESTS=1 bash tuned/build.sh ${GPU_TUNED_VARIANT} && bash tuned/full_test.sh ${GPU_TUNED_VARIANT}" >&2
-    exit 1
-fi
-if [[ "${BUILT_LIB}" -nt "${TEST_RESULTS_FILE}" ]]; then
-    echo "ERROR: ${BUILT_LIB} is newer than ${TEST_RESULTS_FILE} -- the test results predate the current build." >&2
-    echo "  Re-run tuned/full_test.sh ${GPU_TUNED_VARIANT} before publishing." >&2
-    exit 1
-fi
-if ! grep -q "All binaries passed\." "${TEST_RESULTS_FILE}"; then
-    echo "ERROR: ${TEST_RESULTS_FILE} does not show a clean pass -- not publishing." >&2
-    echo "  Last lines:" >&2
-    tail -20 "${TEST_RESULTS_FILE}" >&2
-    exit 1
-fi
-echo "Test gate: ${TEST_RESULTS_FILE} shows a clean pass, newer than the built library. Proceeding."
-
-# Release notes: use tuned/releases/RELEASE_NOTES_<short_ver>_<variant>_<cuda_tag>.md as
-# the release body when present; a draft still carrying the DRAFT banner must not ship.
-RELEASE_NOTES_FILE="${REPODIR}/tuned/releases/RELEASE_NOTES_${SHORT_VER}_${GPU_TUNED_VARIANT}_${CUDA_TAG}.md"
-if [[ -f "${RELEASE_NOTES_FILE}" ]] && grep -q 'DRAFT — not yet published' "${RELEASE_NOTES_FILE}"; then
-    echo "ERROR: ${RELEASE_NOTES_FILE} is still a draft (DRAFT banner present) -- not publishing." >&2
-    exit 1
-fi
-
 # libcuvs (and libcuvs_c) link kvikio, a CPM subproject that cuvs's own
 # install does not install. Without libkvikio.so in the tarball the release
 # loads only on a machine that still has this build tree (v26.10-gb10-cu133
@@ -163,8 +120,49 @@ if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then
 fi
 echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
 
+# Unique shared-object identities, applied to a copy so the build tree's install prefix keeps the
+# names the rest of the build expects. Every shared object this package ships -- cuvs's, and the
+# raft chain and kvikio it vendors -- carries a stock RAPIDS file name and SONAME (librmm.so,
+# librapids_logger.so, libkvikio.so, libcuvs_c.so) and so could be swapped with a stock install in
+# either direction. They become <name>-tuned.so (file name, SONAME, every DT_NEEDED naming them) and
+# the installed CMake import files are repointed. lib${CUVS_LIB_NAME}.so and libraft-${GPU_TUNED_VARIANT}-${CUDA_TAG}.so
+# already carry variant and CUDA tag and are kept; .a archives have no SONAME. Idempotent, so it
+# does not matter whether the vendored raft release was already renamed. See "unique shared-object
+# identities" in tuned-common's tuned-common.sh.
+STAGE="$(mktemp -d)"
+trap 'rm -rf "${STAGE}"' EXIT
+cp -a "${INSTALL_PREFIX}/." "${STAGE}/"
+echo ""
+echo "Giving the shared objects unique identities:"
+OURS_MANIFEST="$(mktemp)"
+for so in librmm.so librapids_logger.so libkvikio.so libcuvs_c.so; do
+    if [[ -f "${STAGE}/lib/${so}" ]]; then
+        echo "${so}" >> "${OURS_MANIFEST}"
+    elif [[ ! -f "${STAGE}/lib/$(gpu_tuned_tuned_so_name "${so}")" ]]; then
+        echo "ERROR: ${so} is missing from ${STAGE}/lib; the rename list is stale." >&2
+        exit 1
+    fi
+done
+KEEP_RE="^lib(${CUVS_LIB_NAME}|raft-${GPU_TUNED_VARIANT}-${CUDA_TAG})\\.so\$"
+gpu_tuned_rename_sonames "${STAGE}/lib" "${OURS_MANIFEST}" "${KEEP_RE}" | sed 's/^/  /'
+rm -f "${OURS_MANIFEST}"
+for so in librmm librapids_logger libkvikio libcuvs_c; do
+    # files naming a renamed library (CMake import files, pkg-config); \b-free: the .so suffix is the anchor
+    grep -rlE "${so}\\.so" "${STAGE}/lib/cmake" "${STAGE}/lib/pkgconfig" 2>/dev/null | while IFS= read -r cf; do
+        sed -i -E "s#${so}\\.so#${so}${GPU_TUNED_SO_MARK}.so#g" "${cf}"
+    done
+done
+if grep -rE 'lib(rmm|rapids_logger|kvikio|cuvs_c)\.so' "${STAGE}/lib/cmake" "${STAGE}/lib/pkgconfig" >/dev/null 2>&1; then
+    echo "ERROR: CMake/pkg-config files still name an unmarked shared object." >&2
+    exit 1
+fi
+# fail closed: every shared object is tuned or kept, every DT_NEEDED resolves in the tree or is a toolkit/system library
+gpu_tuned_verify_unique_sonames "${STAGE}/lib" - "${KEEP_RE}" '^(linux-vdso\.so|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread\.so|librt\.so|libgcc_s\.so|libstdc\+\+\.so|libgomp\.so|libcuda\.so|libcudart\.so|libcublas\.so|libcublasLt\.so|libcusolver\.so|libcusparse\.so|libcurand\.so|libcufft\.so|libnvrtc\.so|libnvJitLink\.so|libnvtx|libcufile\.so)' || exit 1
+# patchelf rewrote the files; the build-info stamp on the cuvs lib must have survived
+gpu_tuned_verify_build_info "${STAGE}/lib/lib${CUVS_LIB_NAME}.so" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" || exit 1
+
 # Refuse to publish a package whose libraries need something it does not ship.
-bash "${REPODIR}/tuned/verify_bundled_deps.sh" "${INSTALL_PREFIX}" || exit 1
+bash "${REPODIR}/tuned/verify_bundled_deps.sh" "${STAGE}" || exit 1
 
 DIST_DIR="$(gpu_tuned_out_dir dist "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"
 rm -rf "${DIST_DIR}"
@@ -172,20 +170,10 @@ mkdir -p "${DIST_DIR}"
 TARBALL="${DIST_DIR}/libcuvs-${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}-g${SHORT_SHA}.tar.gz"
 
 echo ""
-echo "Packaging ${INSTALL_PREFIX} -> ${TARBALL}..."
-tar -C "${INSTALL_PREFIX}" -czf "${TARBALL}" .
+echo "Packaging ${STAGE} (renamed copy of ${INSTALL_PREFIX}) -> ${TARBALL}..."
+tar -C "${STAGE}" -czf "${TARBALL}" .
 echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}'))"
 
-RELEASE_TAG="v${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}-g${SHORT_SHA}"
-RELEASE_TITLE="cuVS ${SHORT_VER} — ${GPU_TUNED_HW_LABEL} (${CUDA_TAG})"
-
 echo ""
-echo "Publishing to GitHub release ${RELEASE_TAG}..."
-gpu_tuned_publish_release "zbrad/cuvs" "${RELEASE_TAG}" "${RELEASE_TITLE}" \
-    "$([[ -f "${RELEASE_NOTES_FILE}" ]] && echo "@${RELEASE_NOTES_FILE}" || echo "lib${CUVS_LIB_NAME}.so ${SHORT_VER} cmake-install tree (lib/, include/, lib/cmake/cuvs/) for ${GPU_TUNED_HW_LABEL}, single-arch (sm_${GPU_TUNED_CUDA_ARCH}). Extract and point -Dcuvs_DIR=<extracted>/lib/cmake/cuvs at it (see zbrad/faiss tuned/build.sh).")" \
-    "${TARBALL}#$(basename "${TARBALL}")" \
-    "${TEST_RESULTS_FILE}#Full test suite results (${GPU_TUNED_VARIANT})"
-
-echo ""
-echo "Release: https://github.com/zbrad/cuvs/releases/tag/${RELEASE_TAG}"
-echo "Done."
+echo "Packaged (not published): ${TARBALL}"
+echo "Publish with: bash tuned/release.sh ${GPU_TUNED_VARIANT}"
