@@ -42,11 +42,15 @@ CUVS_VERSION="$(tr -d '\r' < "${REPODIR}/VERSION")"
 # stamp and the informational "Version:" line above, where precision
 # matters more than brevity.
 SHORT_VER="$(gpu_tuned_short_ver "${CUVS_VERSION}")" || exit 1
-# -g<short-sha> suffix: SHORT_VER alone collides across genuinely
-# different rebuilds (VERSION only bumps on a real upstream release cut)
-# -- matches zbrad/raft's tuned/package.sh, which hit exactly this
-# collision 2026-09-08 (had to delete-and-recreate a tag to republish).
+# Release identity: the UTC date label (docs/ARCHITECTURE.md E2-E4 in tuned-common), not the upstream
+# version or a sha. HEAD's UTC commit date plus the lowest unused sequence for that date among the repo's
+# tags (gpu_tuned_allocate_date_label; GPU_TUNED_LABEL_SEQ=<n> chooses it offline). Allocated once, here, and
+# recorded in package-info.txt; release.sh reads it from there and never recomputes it. The upstream version
+# (CUVS_VERSION, SHORT_VER) is information for the title and notes. Releases published before 2026-10-15 are
+# v<short_ver>-<variant>-<cuda_tag>-g<sha> and are not renamed.
 SHORT_SHA="$(git -C "${REPODIR}" rev-parse --short HEAD)"
+LABEL="$(gpu_tuned_allocate_date_label "${REPODIR}")" || exit 1
+RELEASE_TAG="$(gpu_tuned_native_tag "${GPU_TUNED_VARIANT}" "${CUDA_TAG}" "${LABEL}")" || exit 1
 
 # Must match tuned/build.sh's own default resolution exactly -- this script
 # does not rebuild, it packages whatever tuned/build.sh already installed.
@@ -61,6 +65,23 @@ echo "  Install tree : ${INSTALL_PREFIX}"
 echo "  Library      : lib${CUVS_LIB_NAME}.so"
 echo "  Version      : ${CUVS_VERSION} (${CUDA_TAG})"
 echo ""
+
+# The install tree is packaged as is, so it must come from the source at HEAD. cuvs's build does not stamp
+# its commit, so the reference is the commit its test log was run at (tuned/full_test.sh writes it, and
+# release.sh requires that log to be newer than the build): source outside tuned/ may differ between that
+# commit and HEAD in nothing. A tree built from other source would otherwise be named for today.
+TEST_LOG="$(gpu_tuned_out_dir releases "${REPODIR}" "${CUDA_TAG}")/TEST_RESULTS_${GPU_TUNED_VARIANT}.log"
+[[ -f "${TEST_LOG}" ]] || { echo "ERROR: ${TEST_LOG} not found; run tuned/full_test.sh ${GPU_TUNED_VARIANT} for ${CUDA_TAG} before packaging." >&2; exit 1; }
+TESTED_COMMIT="$(sed -n 's/^commit: *//p' "${TEST_LOG}" | head -1)"
+git -C "${REPODIR}" cat-file -e "${TESTED_COMMIT}^{commit}" 2>/dev/null || { echo "ERROR: ${TEST_LOG} names commit '${TESTED_COMMIT}', which is not in this checkout." >&2; exit 1; }
+STALE_SRC="$(git -C "${REPODIR}" diff --name-only "${TESTED_COMMIT}" HEAD -- . ':!tuned' | head -5)"
+if [[ -n "${STALE_SRC}" ]]; then
+    echo "ERROR: the tests ran at ${TESTED_COMMIT}, but source outside tuned/ changed since:" >&2
+    echo "${STALE_SRC}" | sed 's/^/    /' >&2
+    echo "  Rebuild and re-test before packaging." >&2
+    exit 1
+fi
+echo "  tested at    : ${TESTED_COMMIT}; no source outside tuned/ changed since, packaging at ${SHORT_SHA}"
 
 INSTALLED_LIB="${INSTALL_PREFIX}/lib/lib${CUVS_LIB_NAME}.so"
 if [[ ! -f "${INSTALLED_LIB}" ]]; then
@@ -168,15 +189,27 @@ if grep -rqE 'find_dependency\(nvtx3' "${STAGE}/lib/cmake" 2>/dev/null; then
 fi
 gpu_tuned_verify_consumer_configure "${STAGE}" rmm raft cuvs || exit 1
 DIST_DIR="$(gpu_tuned_out_dir dist "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"
-rm -rf "${DIST_DIR}"
+rm -rf "${DIST_DIR}"   # also removes the previous package-info.txt
 mkdir -p "${DIST_DIR}"
-TARBALL="${DIST_DIR}/libcuvs-${SHORT_VER}-${GPU_TUNED_VARIANT}-${CUDA_TAG}-g${SHORT_SHA}.tar.gz"
+TARBALL="${DIST_DIR}/libcuvs-${RELEASE_TAG#v}.tar.gz"
 
 echo ""
 echo "Packaging ${STAGE} (renamed copy of ${INSTALL_PREFIX}) -> ${TARBALL}..."
 tar -C "${STAGE}" -czf "${TARBALL}" .
 echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}'))"
 
+# Written last: its presence means the package passed every gate above. release.sh requires it.
+cat > "${DIST_DIR}/package-info.txt" <<INFO
+release_tag=${RELEASE_TAG}
+tarball=$(basename "${TARBALL}")
+upstream_version=${CUVS_VERSION}
+commit=${SHORT_SHA}
+tested_commit=${TESTED_COMMIT}
+cuda_tag=${CUDA_TAG}
+variant=${GPU_TUNED_VARIANT}
+sha256=$(sha256sum "${TARBALL}" | awk '{print $1}')
+INFO
+
 echo ""
-echo "Packaged (not published): ${TARBALL}"
-echo "Publish with: bash tuned/release.sh ${GPU_TUNED_VARIANT}"
+echo "Packaged (not published): ${TARBALL} (${RELEASE_TAG})"
+echo "Next: bash tuned/smoke_test.sh ${GPU_TUNED_VARIANT}, then bash tuned/release.sh ${GPU_TUNED_VARIANT}"

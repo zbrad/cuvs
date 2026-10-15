@@ -48,30 +48,20 @@ resolve_raft_release() {
     local tag
     if [[ -n "${RAFT_RELEASE_TARBALL:-}" ]]; then
         # Use a raft tarball built locally by raft's tuned/package.sh before it is published
-        # (raft/tuned/build/<cuda>/dist/raft-<ver>-<variant>-<cuda>-g<sha>.tar.bz2). The tag is
+        # (raft/tuned/build/<cuda>/dist/raft-0.<date>.<seq>-<variant>-<cuda>.tar.bz2). The tag is
         # derived from the file name and is recorded as unpublished in the build-info stamp.
         [[ -f "${RAFT_RELEASE_TARBALL}" ]] || { echo "ERROR: RAFT_RELEASE_TARBALL=${RAFT_RELEASE_TARBALL} does not exist." >&2; exit 1; }
         tag="$(basename "${RAFT_RELEASE_TARBALL}" .tar.bz2)"
-        [[ "${tag}" =~ ^raft-.+-${variant}-${cuda_tag}-g[0-9a-f]+$ ]] || { echo "ERROR: ${tag} does not look like a raft ${variant}-${cuda_tag} package name." >&2; exit 1; }
+        [[ "${tag}" =~ ^raft-(0\.[0-9]{8}\.[0-9]+|.+)-${variant}-${cuda_tag}(-g[0-9a-f]+)?$ ]] || { echo "ERROR: ${tag} does not look like a raft ${variant}-${cuda_tag} package name." >&2; exit 1; }
         tag="v${tag#raft-}"
         RAFT_RELEASE_LOCAL=1
         echo "Using local, unpublished raft package: ${RAFT_RELEASE_TARBALL}"
     else
     echo "Looking up zbrad/raft tuned-builds release for ${variant}-${cuda_tag}..."
-    # raft now publishes v<ver>-<variant>-<cuda_tag>[-g<short-sha>], the
-    # same order as this repo's own release tags -- match the same way
-    # faiss matches cuvs's tags. (Was variant-suffix-only, back when
-    # raft's tag order was v<ver>.0-cuda<compact>-<variant>, cuda tag
-    # *before* variant -- that's been unified to match cuvs's order now.)
-    # The optional -g<sha> suffix (added 2026-09-08, see raft's own
-    # tuned/package.sh/release.sh comments) is why this can no longer
-    # anchor on end-of-string with a bare \$ -- that regex silently fell
-    # through to an older, unsuffixed release instead of the newest one,
-    # exactly the kind of stale-pairing bug the suffix exists to prevent.
-    # `gh release list` is already newest-first, so `head -1` still picks
-    # the right one once the anchor allows the suffix.
-    tag="$(gh release list --repo zbrad/raft --json tagName -q '.[].tagName' 2>/dev/null \
-        | grep -E -- "-${variant}-${cuda_tag}(-g[0-9a-f]+)?\$" | head -1)"
+    # Newest by date label, ranked as numbers (gpu_tuned_newest_release_tag); an older-form
+    # v<ver>-<variant>-<cuda>-g<sha> tag is only a loud fallback while no date-label release exists.
+    tag="$(gh release list --repo zbrad/raft --limit 100 --json tagName -q '.[].tagName' 2>/dev/null \
+        | gpu_tuned_newest_release_tag "${variant}" "${cuda_tag}")" || true
     if [[ -z "${tag}" ]]; then
         echo "ERROR: no zbrad/raft release found matching '*-${variant}'." >&2
         echo "  Available releases:" >&2
