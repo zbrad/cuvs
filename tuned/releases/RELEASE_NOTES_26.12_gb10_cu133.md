@@ -1,6 +1,6 @@
 # cuVS 26.12 — GB10 / DGX Spark Release Notes (CUDA 13.3)
 
-**Release Date**: 2026-10-12
+**Release Date**: 2026-10-15
 **Package**: `libcuvs-26.12-gb10-cu133-g<commit>.tar.gz` (`<commit>` is the 8-hex suffix of this release's tag)
 **Platform**: aarch64
 **GPU Architecture**: SM_121a (GB10 / DGX Spark, Grace Blackwell)
@@ -14,7 +14,8 @@ instead of 13.4, single-arch for `sm_121a`, as `libcuvs-gb10-cu133.so`, for cons
 moved to the 13.4 toolkit. The full list of changes (upstream sync to `NVIDIA/cuvs` `main` at
 `24b0b1706`, rapids-cmake pin `61a96c8f`, the unique `-tuned` shared-object names, the fixed
 regression test, the package/release split) is in `RELEASE_NOTES_26.12_gb10_cu134.md`. It supersedes
-`v26.12-gb10-cu133-g1c38fcf18` (2026-09-22), which shipped the stock RAPIDS library names.
+`v26.12-gb10-cu133-gcc3a7a1b` (2026-10-12), whose RAFT dependency lacked nvtx3 so a consumer configured against
+the package alone could not find it, and before that `v26.12-gb10-cu133-g1c38fcf18` (2026-09-22), which shipped the stock RAPIDS library names.
 
 **Shared objects renamed.** This package ships `librmm-tuned.so`, `librapids_logger-tuned.so`,
 `libkvikio-tuned.so` and `libcuvs_c-tuned.so` instead of the stock names; `libcuvs-gb10-cu133.so`
@@ -27,8 +28,8 @@ earlier CUDA 13.3 release are those described there.
 ## Depends on RAFT
 
 This cuVS was built and tested against the published RAFT release
-[`v26.12-gb10-cu133-g680788c8`](https://github.com/zbrad/raft/releases/tag/v26.12-gb10-cu133-g680788c8)
-(RAFT 26.12, CUDA 13.3.73, CCCL 3.5.0, `sm_121a`; 16/16 RAFT gtest binaries). `tuned/build.sh`
+[`v26.12-gb10-cu133-g0ecd5206`](https://github.com/zbrad/raft/releases/tag/v26.12-gb10-cu133-g0ecd5206)
+(RAFT 26.12, CUDA 13.3.73, CCCL 3.5.0, `sm_121a`; 16/16 RAFT gtest binaries), the first cu133 RAFT package that ships nvtx3. `tuned/build.sh`
 downloads and extracts that release, so the build does not compile RAFT from source. cuVS does not
 pin a RAFT commit; it requires RAFT at its own RAPIDS major.minor, so compatibility comes from these
 paired, tested releases (recorded in `tuned/docs/RELEASE_PINS.md`). A RAFT built from a different
@@ -44,13 +45,13 @@ from each bundled package's version file, recorded in the library's build-info s
 ## Full Test Suite Result
 
 **37/37 gtest binaries passed, 0 failed; 12,476 tests passed, 2,702 skipped** (`tuned/full_test.sh`,
-started 03:42Z, finished 04:19Z on 2026-10-13, 37 minutes, one binary at a time). Full output
+finished 07:27Z on 2026-10-15, one binary at a time, on commit `89e167a8`). Full output
 attached as `TEST_RESULTS_gb10.log` on this release. One known-flaky case is excluded from the gate:
 `KmeansFitBatchedTestF.Result/4` ([`NVIDIA/cuvs#2657`](https://github.com/NVIDIA/cuvs/issues/2657),
 open); it is run once and recorded, and passed this run. The counts equal the CUDA 13.4 build's.
 
-Build timing, cold ccache for this toolkit: wall 1,131 s with `-j20`, 7,052 timed units (summed unit
-time 20,528 s), ccache 0 of 2,234 hits.
+Build timing, cold ccache for this toolkit: wall 1,015 s, 7,052 timed units (summed unit
+time 19,982 s), ccache 0 of 2,234 hits.
 
 
 ## Test Skips and Known Issues
