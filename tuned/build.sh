@@ -216,7 +216,7 @@ echo ""
 
 LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-"$(gpu_tuned_out_dir build "${REPODIR}" "${CUDA_TAG}" "${GPU_TUNED_VARIANT}")"}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-${PREFIX:-${CONDA_PREFIX:-${LIBCUVS_BUILD_DIR}/install}}}"
-PARALLEL_LEVEL="${PARALLEL_LEVEL:-$(nproc)}"
+PARALLEL_LEVEL="${PARALLEL_LEVEL:-$(gpu_tuned_jobs)}"
 
 gpu_tuned_assert_cmake_cache_consistent "${LIBCUVS_BUILD_DIR}" || exit 1
 # Timing: ninja appends to its log across runs, so only what lands after this point is this build.
