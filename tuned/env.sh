@@ -90,16 +90,20 @@ gpu_tuned_verify_toolkit || return 1 2>/dev/null || exit 1
 gpu_tuned_load_repo_env "${GPU_TUNED_SELF_DIR}/repo.env" || return 1 2>/dev/null || exit 1
 export CUVS_BUILD_MG_ALGOS CUVS_DEVICE_LABEL
 
-# embed_build_info now comes from common.sh (gpu_tuned_embed_build_info) --
-# this repo's every call site already passes package="cuvs" (matching
-# every call: package.sh's tuned/package.sh), so the shared function's
-# package-derived section name naturally lands on the same
-# .cuvs_build_info this repo always used, and its message format
-# (`<package>-<variant> build: <package> v<version> (<hw_label>), <repo_url>,
-# built <date>`) is byte-identical to what the old local version produced.
-# Wrap it just to keep call sites unchanged (repo_url baked in here).
+# embed_build_info <staged-elf> <component> <release-tag> [name=value...] -- stamps the JSON build info
+# (tuned-common, docs/ARCHITECTURE.md "Build info") into <staged-elf>'s .tuned_build_info section; read it with
+#   gpu_tuned_read_build_info <elf> | jq .
+# The release tag is the identity. Extra fields (deps.*) are passed through; the git fields (fork, upstream)
+# are added from the checkout the packager runs in.
 embed_build_info() {
-    gpu_tuned_embed_build_info "$1" "$2" "$3" "$4" "$5" "https://github.com/zbrad/cuvs"
+    local target="$1" component="$2" release="$3" nvcc_full
+    shift 3
+    nvcc_full="$("${CUDA_HOME}/bin/nvcc" --version | sed -n 's/.*release [0-9.]*, V\([0-9.]*\).*/\1/p' | head -1)"
+    gpu_tuned_embed_build_info_json "${target}" \
+        package=cuvs "component=${component}" "release=${release}" "variant=${GPU_TUNED_VARIANT}" \
+        "hardware=${GPU_TUNED_HW_LABEL}" "arch=sm_${GPU_TUNED_CUDA_ARCH}" \
+        "cuda.tag=${CUDA_TAG}" "cuda.version=${CUDA_VER}" "cuda.nvcc=${nvcc_full:-unknown}" \
+        "$@"
 }
 
 # cuvs_check_raft_version <libcuvs_build_dir> <cuvs_repodir> — surfaces which

@@ -125,12 +125,15 @@ unset _pkg _ver_file _ver
 export GPU_TUNED_BUILD_INFO_DEPS="${BUNDLED_DEPS}"
 echo "  bundled deps : ${BUNDLED_DEPS:-none}"
 
-embed_build_info "${INSTALLED_LIB}" "${GPU_TUNED_VARIANT}" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" "${GPU_TUNED_HW_LABEL}"
-# Confirm the stamp actually landed before archiving -- the tarball is a
-# straight `tar -czf` of INSTALL_PREFIX below with no further build/install
-# pass, so this should always pass, but every other repo in this fleet
-# validates its stamp right after writing it rather than assuming.
-gpu_tuned_verify_build_info "${INSTALLED_LIB}" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" || exit 1
+_raft_dirs=("${GPU_TUNED_BUILD_ROOT}"/raft/*/)
+RAFT_DEP=()
+[[ ${#_raft_dirs[@]} -eq 1 && -d "${_raft_dirs[0]}" ]] && RAFT_DEP=("deps.raft.release=$(basename "${_raft_dirs[0]}")")
+unset _raft_dirs
+embed_build_info "${INSTALLED_LIB}" "$(basename "${INSTALLED_LIB}")" "${RELEASE_TAG}" \
+    "deps.bundled=${BUNDLED_DEPS}" "${RAFT_DEP[@]}"
+# Confirm the stamp actually landed before archiving -- the tarball is a straight `tar -czf` of
+# INSTALL_PREFIX below with no further build/install pass, so this should always pass.
+gpu_tuned_verify_build_info_json "${INSTALLED_LIB}" "release=${RELEASE_TAG}" "variant=${GPU_TUNED_VARIANT}" "cuda.tag=${CUDA_TAG}" || exit 1
 
 CUVS_CMAKE_CONFIG="$(find "${INSTALL_PREFIX}" -maxdepth 4 -iname 'cuvs-config.cmake' 2>/dev/null | head -1)"
 if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then
@@ -172,7 +175,7 @@ gpu_tuned_rename_package "${STAGE}/lib" "${OURS_MANIFEST}" - "${KEEP_RE}" \
     "${STAGE}/lib/cmake" "${STAGE}/lib/pkgconfig" || exit 1
 rm -f "${OURS_MANIFEST}"
 # patchelf rewrote the files; the build-info stamp on the cuvs lib must have survived
-gpu_tuned_verify_build_info "${STAGE}/lib/lib${CUVS_LIB_NAME}.so" "cuvs" "${CUVS_VERSION}+${CUDA_TAG}" || exit 1
+gpu_tuned_verify_build_info_json "${STAGE}/lib/lib${CUVS_LIB_NAME}.so" "release=${RELEASE_TAG}" "variant=${GPU_TUNED_VARIANT}" "cuda.tag=${CUDA_TAG}" || exit 1
 
 # Refuse to publish a package whose libraries need something it does not ship.
 bash "${REPODIR}/tuned/verify_bundled_deps.sh" "${STAGE}" || exit 1
