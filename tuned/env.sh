@@ -68,43 +68,15 @@ source "${GPU_TUNED_SELF_DIR}/common.sh" || return 1 2>/dev/null || exit 1
 # equivalent x86_64 check at all -- this makes it uniform across all three.)
 gpu_tuned_assert_platform "${GPU_TUNED_PLATFORM}" "${GPU_TUNED_VARIANT}" || return 1 2>/dev/null || exit 1
 
-# --- CUDA toolkit: chosen from tuned/common-data/toolkits, never inferred from /usr/local/cuda or
-#     from what is installed. CUDA_TAG (cu133) or CUDA_VER (13.3) select one; neither set is an
-#     error listing the defined ones (no default). Exports CUDA_VER, CUDA_TAG, CUDA_HOME and puts
-#     $CUDA_HOME/bin on PATH. ---
-_cuvs_tk="${CUDA_TAG:-}"
-_cuvs_req_ver="${CUDA_VER:-}"
-if [ -z "${_cuvs_tk}" ] && [ -n "${_cuvs_req_ver}" ]; then
-    _cuvs_tk="cu${_cuvs_req_ver//./}"                           # 13.3 -> cu133
-fi
-gpu_tuned_load_toolkit "${GPU_TUNED_DATA_DIR}" "${GPU_TUNED_VARIANT}" "${_cuvs_tk}" || return 1 2>/dev/null || exit 1
-if [ -n "${_cuvs_req_ver}" ] && [ "${_cuvs_req_ver}" != "${TOOLKIT_CUDA_VER}" ]; then
-    echo "[tuned/env] ERROR: CUDA_VER=${_cuvs_req_ver} conflicts with toolkit ${CUDA_TAG} (CUDA ${TOOLKIT_CUDA_VER})." >&2
-    return 1 2>/dev/null || exit 1
-fi
-unset _cuvs_tk _cuvs_req_ver
-gpu_tuned_verify_toolkit || return 1 2>/dev/null || exit 1
+# --- CUDA toolkit: named by CUDA_TAG (cu133) or CUDA_VER (13.3), never defaulted or guessed; loaded from
+#     tuned/common-data/toolkits and verified (docs/ARCHITECTURE.md B4). Exports CUDA_VER, CUDA_TAG, CUDA_HOME
+#     and puts $CUDA_HOME/bin on PATH. ---
+gpu_tuned_select_toolkit "${GPU_TUNED_DATA_DIR}" "${GPU_TUNED_VARIANT}" || return 1 2>/dev/null || exit 1
 
 # --- Repo-specific settings (per-variant MG algos and device label), loaded last; may not
 #     change any shared device/toolkit key. ---
 gpu_tuned_load_repo_env "${GPU_TUNED_SELF_DIR}/repo.env" || return 1 2>/dev/null || exit 1
 export CUVS_BUILD_MG_ALGOS CUVS_DEVICE_LABEL
-
-# embed_build_info <staged-elf> <component> <release-tag> [name=value...] -- stamps the JSON build info
-# (tuned-common, docs/ARCHITECTURE.md "Build info") into <staged-elf>'s .tuned_build_info section; read it with
-#   gpu_tuned_read_build_info <elf> | jq .
-# The release tag is the identity. Extra fields (deps.*) are passed through; the git fields (fork, upstream)
-# are added from the checkout the packager runs in.
-embed_build_info() {
-    local target="$1" component="$2" release="$3" nvcc_full
-    shift 3
-    nvcc_full="$("${CUDA_HOME}/bin/nvcc" --version | sed -n 's/.*release [0-9.]*, V\([0-9.]*\).*/\1/p' | head -1)"
-    gpu_tuned_embed_build_info_json "${target}" \
-        package=cuvs "component=${component}" "release=${release}" "variant=${GPU_TUNED_VARIANT}" \
-        "hardware=${GPU_TUNED_HW_LABEL}" "arch=sm_${GPU_TUNED_CUDA_ARCH}" \
-        "cuda.tag=${CUDA_TAG}" "cuda.version=${CUDA_VER}" "cuda.nvcc=${nvcc_full:-unknown}" \
-        "$@"
-}
 
 # cuvs_check_raft_version <libcuvs_build_dir> <cuvs_repodir> — surfaces which
 # raft this build actually linked against.

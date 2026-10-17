@@ -129,11 +129,8 @@ _raft_dirs=("${GPU_TUNED_BUILD_ROOT}"/raft/*/)
 RAFT_DEP=()
 [[ ${#_raft_dirs[@]} -eq 1 && -d "${_raft_dirs[0]}" ]] && RAFT_DEP=("deps.raft.release=$(basename "${_raft_dirs[0]}")")
 unset _raft_dirs
-embed_build_info "${INSTALLED_LIB}" "$(basename "${INSTALLED_LIB}")" "${RELEASE_TAG}" \
-    "deps.bundled=${BUNDLED_DEPS}" "${RAFT_DEP[@]}"
-# Confirm the stamp actually landed before archiving -- the tarball is a straight `tar -czf` of
-# INSTALL_PREFIX below with no further build/install pass, so this should always pass.
-gpu_tuned_verify_build_info_json "${INSTALLED_LIB}" "release=${RELEASE_TAG}" "variant=${GPU_TUNED_VARIANT}" "cuda.tag=${CUDA_TAG}" || exit 1
+# Stamp the staged library with the JSON build info (release first) and confirm it landed before archiving.
+gpu_tuned_stamp_lib_json "${INSTALLED_LIB}" cuvs "${RELEASE_TAG}" "" "deps.bundled=${BUNDLED_DEPS}" ${RAFT_DEP[@]+"${RAFT_DEP[@]}"} || exit 1
 
 CUVS_CMAKE_CONFIG="$(find "${INSTALL_PREFIX}" -maxdepth 4 -iname 'cuvs-config.cmake' 2>/dev/null | head -1)"
 if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then
@@ -201,11 +198,8 @@ echo "Packaging ${STAGE} (renamed copy of ${INSTALL_PREFIX}) -> ${TARBALL}..."
 tar -C "${STAGE}" -czf "${TARBALL}" .
 echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}'))"
 
-# sha256sum-format sidecar (digest + file name), attached to the release so a consumer can verify the download.
-SHA_FILE="${TARBALL}.sha256"
-(cd "${DIST_DIR}" && sha256sum "$(basename "${TARBALL}")" > "$(basename "${SHA_FILE}")")
-(cd "${DIST_DIR}" && sha256sum -c --quiet "$(basename "${SHA_FILE}")") || { echo "ERROR: the sha256 sidecar does not match the tarball" >&2; exit 1; }
-echo "Checksum: $(basename "${SHA_FILE}")"
+# sha256sum-format sidecar, attached to the release so a consumer can verify the download.
+gpu_tuned_write_sha256_sidecar "${TARBALL}" || exit 1
 
 # Written last: its presence means the package passed every gate above. release.sh requires it.
 cat > "${DIST_DIR}/package-info.txt" <<INFO
