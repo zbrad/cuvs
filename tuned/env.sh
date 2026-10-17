@@ -9,17 +9,19 @@
 # Consolidates what used to be scripts/cuda_env.sh (CUDA_VER/CUDA_TAG/
 # CUDA_HOME detection, identical logic, just relocated) plus the
 # device-specific values that used to be hardcoded separately in each of
-# build_gb10.sh/build_rtx40.sh/build_rtx50.sh -- now in
-# tuned/devices/<variant>.conf, one file per variant, following the same
-# GPU_TUNED_* convention as zbrad/raft's tuned/env.sh.
+# build_gb10.sh/build_rtx40.sh/build_rtx50.sh -- now the shared device files in
+# tuned/common-data/devices/<variant>.conf (zbrad/tuned-common), with cuvs's own
+# per-variant settings (CUVS_*) in tuned/repo.env.
 #
-# Specify the CUDA version at build time with EITHER variable (the other is
-# derived), same as before:
+# The toolkit comes from the vendored definitions in tuned/common-data/toolkits/<id>.env
+# (zbrad/tuned-common), never from /usr/local/cuda or from what is installed. There is no
+# default: name it with EITHER variable (the other is derived):
 #
 #   CUDA_VER=13.3  bash tuned/build.sh gb10
 #   CUDA_TAG=cu133 bash tuned/build.sh gb10
 #
-# Defaults to CUDA 13.2 (cu132) when neither is set.
+# With neither set the loader fails and lists the defined toolkits (at a terminal it asks
+# which to use, for that run only). Repo-specific settings live in tuned/repo.env.
 #
 # Exported variables:
 #   CUDA_VER / CUDA_TAG / CUDA_HOME
@@ -28,9 +30,10 @@
 #       gpu-cu/scripts/cuda_env.sh, already referenced by name throughout
 #       this repo's docs and by faiss's own build scripts; renaming would
 #       break those references for no benefit).
-#   GPU_TUNED_VARIANT / GPU_TUNED_PLATFORM / GPU_TUNED_CUDA_ARCH /
-#   GPU_TUNED_BUILD_MG_ALGOS / GPU_TUNED_HW_LABEL / GPU_TUNED_DEVICE_LABEL
-#     — from tuned/devices/<variant>.conf, re-exported here.
+#   GPU_TUNED_VARIANT / GPU_TUNED_PLATFORM / GPU_TUNED_CUDA_ARCH / GPU_TUNED_HW_LABEL
+#     — from the shared tuned/common-data/devices/<variant>.conf, re-exported here.
+#   CUVS_BUILD_MG_ALGOS / CUVS_DEVICE_LABEL
+#     — from tuned/repo.env (per variant).
 #
 # Also defines gpu_tuned_verify_arch() and cuvs_check_raft_version() -- see
 # below.
@@ -42,9 +45,10 @@ if [[ -z "${GPU_TUNED_ARG_VARIANT}" ]]; then
 fi
 
 GPU_TUNED_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=devices/rtx50.conf
-source "${GPU_TUNED_SELF_DIR}/devices/${GPU_TUNED_ARG_VARIANT}.conf" || return 1 2>/dev/null || exit 1
-export GPU_TUNED_VARIANT GPU_TUNED_PLATFORM GPU_TUNED_CUDA_ARCH GPU_TUNED_BUILD_MG_ALGOS GPU_TUNED_HW_LABEL GPU_TUNED_DEVICE_LABEL
+GPU_TUNED_DATA_DIR="${GPU_TUNED_SELF_DIR}/common-data"
+# shellcheck source=common-data/devices/gb10.conf
+source "${GPU_TUNED_DATA_DIR}/devices/${GPU_TUNED_ARG_VARIANT}.conf" || return 1 2>/dev/null || exit 1
+export GPU_TUNED_VARIANT GPU_TUNED_PLATFORM GPU_TUNED_CUDA_ARCH GPU_TUNED_HW_LABEL
 
 # shellcheck source=common.sh
 # Vendored from https://github.com/zbrad/tuned-common (pinned commit --
@@ -64,52 +68,27 @@ source "${GPU_TUNED_SELF_DIR}/common.sh" || return 1 2>/dev/null || exit 1
 # equivalent x86_64 check at all -- this makes it uniform across all three.)
 gpu_tuned_assert_platform "${GPU_TUNED_PLATFORM}" "${GPU_TUNED_VARIANT}" || return 1 2>/dev/null || exit 1
 
-# --- Resolve CUDA_VER / CUDA_TAG (specify either, derive the other) ---
-if [ -n "${CUDA_VER:-}" ]; then
-    : "${CUDA_TAG:=cu${CUDA_VER//./}}"                          # 13.3 -> cu133
-elif [ -n "${CUDA_TAG:-}" ]; then
-    _cuda_digits="${CUDA_TAG#cu}"                               # cu133 -> 133
-    : "${CUDA_VER:=${_cuda_digits%?}.${_cuda_digits: -1}}"     # 133 -> 13.3
-    unset _cuda_digits
+# --- CUDA toolkit: chosen from tuned/common-data/toolkits, never inferred from /usr/local/cuda or
+#     from what is installed. CUDA_TAG (cu133) or CUDA_VER (13.3) select one; neither set is an
+#     error listing the defined ones (no default). Exports CUDA_VER, CUDA_TAG, CUDA_HOME and puts
+#     $CUDA_HOME/bin on PATH. ---
+_cuvs_tk="${CUDA_TAG:-}"
+_cuvs_req_ver="${CUDA_VER:-}"
+if [ -z "${_cuvs_tk}" ] && [ -n "${_cuvs_req_ver}" ]; then
+    _cuvs_tk="cu${_cuvs_req_ver//./}"                           # 13.3 -> cu133
 fi
-if [ -z "${CUDA_VER:-}" ]; then
-    _cuvs_latest="$(gpu_tuned_installed_cuda_toolkits | tail -1)"
-    CUDA_VER="${_cuvs_latest:-13.2}"  # last-resort fallback if nothing is installed yet
-    unset _cuvs_latest
+gpu_tuned_load_toolkit "${GPU_TUNED_DATA_DIR}" "${GPU_TUNED_VARIANT}" "${_cuvs_tk}" || return 1 2>/dev/null || exit 1
+if [ -n "${_cuvs_req_ver}" ] && [ "${_cuvs_req_ver}" != "${TOOLKIT_CUDA_VER}" ]; then
+    echo "[tuned/env] ERROR: CUDA_VER=${_cuvs_req_ver} conflicts with toolkit ${CUDA_TAG} (CUDA ${TOOLKIT_CUDA_VER})." >&2
+    return 1 2>/dev/null || exit 1
 fi
-export CUDA_VER
-export CUDA_TAG="${CUDA_TAG:-cu${CUDA_VER//./}}"
+unset _cuvs_tk _cuvs_req_ver
+gpu_tuned_verify_toolkit || return 1 2>/dev/null || exit 1
 
-# --- Resolve CUDA_HOME to the matching toolkit when not explicitly set ---
-if [ -z "${CUDA_HOME:-}" ]; then
-    if [ -d "/usr/local/cuda-${CUDA_VER}" ]; then
-        export CUDA_HOME="/usr/local/cuda-${CUDA_VER}"
-    else
-        echo "[tuned/env] WARNING: /usr/local/cuda-${CUDA_VER} not found; falling back to /usr/local/cuda (whatever version that symlinks to)." >&2
-        _cuvs_installed="$(gpu_tuned_installed_cuda_toolkits | tr '\n' ' ')"
-        if [ -n "$_cuvs_installed" ]; then
-            echo "[tuned/env]          Installed toolkits: ${_cuvs_installed}. Set CUDA_VER to one of these, or CUDA_HOME to an explicit path." >&2
-        else
-            echo "[tuned/env]          No /usr/local/cuda-<ver> toolkits found at all." >&2
-        fi
-        unset _cuvs_installed
-        export CUDA_HOME="/usr/local/cuda"
-    fi
-fi
-export PATH="$CUDA_HOME/bin:$PATH"
-
-# --- Sanity: warn if the resolved nvcc does not match the requested version ---
-if command -v nvcc >/dev/null 2>&1; then
-    _nvcc_ver="$(nvcc --version 2>/dev/null | grep -oE 'release [0-9]+\.[0-9]+' | awk '{print $2}')"
-    if [ -n "$_nvcc_ver" ] && [ "$_nvcc_ver" != "$CUDA_VER" ]; then
-        echo "[tuned/env] WARNING: nvcc reports CUDA $_nvcc_ver but CUDA_VER=$CUDA_VER" >&2
-        echo "[tuned/env]          (CUDA_HOME=$CUDA_HOME). Set CUDA_HOME or CUDA_VER to match." >&2
-        _cuvs_installed="$(gpu_tuned_installed_cuda_toolkits | tr '\n' ' ')"
-        [ -n "$_cuvs_installed" ] && echo "[tuned/env]          Installed toolkits: ${_cuvs_installed}" >&2
-        unset _cuvs_installed
-    fi
-    unset _nvcc_ver
-fi
+# --- Repo-specific settings (per-variant MG algos and device label), loaded last; may not
+#     change any shared device/toolkit key. ---
+gpu_tuned_load_repo_env "${GPU_TUNED_SELF_DIR}/repo.env" || return 1 2>/dev/null || exit 1
+export CUVS_BUILD_MG_ALGOS CUVS_DEVICE_LABEL
 
 # embed_build_info now comes from common.sh (gpu_tuned_embed_build_info) --
 # this repo's every call site already passes package="cuvs" (matching

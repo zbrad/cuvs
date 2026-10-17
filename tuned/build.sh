@@ -11,7 +11,7 @@
 # Consolidates what used to be three ~90%-identical root-level scripts
 # (build_gb10.sh, build_rtx40.sh, build_rtx50.sh, plus the build_dgx_spark.sh/
 # build_ada_blackwell.sh compat shims that pointed at them) into one,
-# parameterized by tuned/devices/<variant>.conf. All of that non-upstream
+# parameterized by tuned/common-data/devices/<variant>.conf (shared) and tuned/repo.env. All of that non-upstream
 # tooling now lives under tuned/ -- see tuned/docs/BINARY_BUILD_INFO.md's
 # "Deprecated script names" table for the old-name -> new-invocation mapping.
 #
@@ -173,7 +173,7 @@ else
 fi
 
 echo "===================================================="
-echo "cuVS ${GPU_TUNED_DEVICE_LABEL} Build"
+echo "cuVS ${CUVS_DEVICE_LABEL} Build"
 echo "===================================================="
 echo ""
 echo "  Target GPU : ${GPU_TUNED_HW_LABEL}"
@@ -232,7 +232,7 @@ if command -v ccache >/dev/null 2>&1; then
     )
 fi
 
-# BUILD_MG_ALGOS=ON (rtx40/rtx50, see tuned/devices/<variant>.conf) makes
+# BUILD_MG_ALGOS=ON (rtx40/rtx50, see tuned/common-data/devices/<variant>.conf (shared) and tuned/repo.env) makes
 # cpp/CMakeLists.txt's find_package(NCCL REQUIRED) unconditional. The pip
 # nvidia-nccl-cu13 wheel only ships a versioned libnccl.so.2 -- no
 # unversioned libnccl.so symlink FindNCCL.cmake's default find_library()
@@ -242,7 +242,7 @@ fi
 # BUILD_MG_ALGOS=OFF, so find_package(NCCL) never runs there -- no NCCL
 # wiring needed.
 NCCL_CMAKE_ARGS=()
-if [[ "${GPU_TUNED_BUILD_MG_ALGOS}" == "ON" ]]; then
+if [[ "${CUVS_BUILD_MG_ALGOS}" == "ON" ]]; then
     NCCL_PY_PREFIX="$(python3 -c 'import nvidia.nccl as m; print(list(m.__path__)[0])' 2>/dev/null)" || true
     if [[ -z "${NCCL_PY_PREFIX}" ]]; then
         echo "ERROR: BUILD_MG_ALGOS=ON requires NCCL, but 'python3 -c import nvidia.nccl'" >&2
@@ -286,7 +286,7 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   -DBUILD_C_TESTS="${GPU_TUNED_BUILD_TESTS:-OFF}" \
   -DBUILD_CUVS_BENCH=OFF \
   -DBUILD_CPU_ONLY=OFF \
-  -DBUILD_MG_ALGOS="${GPU_TUNED_BUILD_MG_ALGOS}" \
+  -DBUILD_MG_ALGOS="${CUVS_BUILD_MG_ALGOS}" \
   -DBUILD_SHARED_LIBS=ON \
   "-DCUVS_OUTPUT_NAME=${CUVS_LIB_NAME}" \
   "-DCMAKE_PREFIX_PATH=${RAFT_RELEASE_DIR}" \
@@ -422,7 +422,7 @@ fi
 
 echo ""
 echo "===================================================="
-echo "${GPU_TUNED_DEVICE_LABEL} Build Complete!"
+echo "${CUVS_DEVICE_LABEL} Build Complete!"
 echo "===================================================="
 echo ""
 echo "  ✓ ${GPU_TUNED_HW_LABEL} native binary"

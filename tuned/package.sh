@@ -58,7 +58,7 @@ LIBCUVS_BUILD_DIR="${LIBCUVS_BUILD_DIR:-"$(gpu_tuned_out_dir build "${REPODIR}" 
 INSTALL_PREFIX="${INSTALL_PREFIX:-${PREFIX:-${CONDA_PREFIX:-${LIBCUVS_BUILD_DIR}/install}}}"
 
 echo "===================================================="
-echo "cuVS ${GPU_TUNED_DEVICE_LABEL} Package"
+echo "cuVS ${CUVS_DEVICE_LABEL} Package"
 echo "===================================================="
 echo ""
 echo "  Install tree : ${INSTALL_PREFIX}"

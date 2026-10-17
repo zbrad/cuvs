@@ -47,7 +47,7 @@ vLLM-style codename convention on 2026-07-06.
 
 5. **One consolidated build script, parameterized by GPU codename** —
    `tuned/build.sh gb10` / `tuned/build.sh rtx40` / `tuned/build.sh rtx50`,
-   driven by `tuned/devices/<codename>.conf`. (The three previously-separate
+   driven by `tuned/common-data/devices/<codename>.conf (shared) and tuned/repo.env`. (The three previously-separate
    root-level scripts, `build_gb10.sh`/`build_rtx40.sh`/`build_rtx50.sh`,
    were ~90% identical and have been removed entirely along with all other
    non-upstream tuned-build tooling that used to be scattered at the repo
