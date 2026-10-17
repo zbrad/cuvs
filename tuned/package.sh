@@ -198,6 +198,12 @@ echo "Packaging ${STAGE} (renamed copy of ${INSTALL_PREFIX}) -> ${TARBALL}..."
 tar -C "${STAGE}" -czf "${TARBALL}" .
 echo "Tarball: $(basename "${TARBALL}") ($(du -sh "${TARBALL}" | awk '{print $1}'))"
 
+# sha256sum-format sidecar (digest + file name), attached to the release so a consumer can verify the download.
+SHA_FILE="${TARBALL}.sha256"
+(cd "${DIST_DIR}" && sha256sum "$(basename "${TARBALL}")" > "$(basename "${SHA_FILE}")")
+(cd "${DIST_DIR}" && sha256sum -c --quiet "$(basename "${SHA_FILE}")") || { echo "ERROR: the sha256 sidecar does not match the tarball" >&2; exit 1; }
+echo "Checksum: $(basename "${SHA_FILE}")"
+
 # Written last: its presence means the package passed every gate above. release.sh requires it.
 cat > "${DIST_DIR}/package-info.txt" <<INFO
 release_tag=${RELEASE_TAG}
