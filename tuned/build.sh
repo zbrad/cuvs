@@ -261,10 +261,12 @@ if [[ "${CUVS_BUILD_MG_ALGOS}" == "ON" ]]; then
     )
 fi
 
-# Unique shared-object identities at build time: the fetched kvikio and our own cuvs_c get OUTPUT_NAME
-# <name>-tuned through a CMake include (no upstream source is edited), so the build tree, the install
-# tree, every DT_NEEDED and the CMake export files all carry the names we ship. librmm and
-# librapids_logger arrive already renamed in the raft release (zbrad/raft builds them that way).
+# Unique shared-object identities at build time (docs/ARCHITECTURE.md F1), through a CMake include (no upstream
+# source is edited), so the build tree, the install tree, every DT_NEEDED and the CMake export files all carry the
+# names we ship: the fetched kvikio has no device code and gets OUTPUT_NAME kvikio-<toolkit>; our own cuvs_c has
+# none either but NEEDs lib${CUVS_LIB_NAME}.so, so it carries the variant too (cuvs_c-<variant>-<toolkit>; the
+# variant is transitive). librmm and librapids_logger arrive already named librmm-<toolkit>.so in the raft
+# release (zbrad/raft builds them that way).
 # Pip wheels in the user site-packages ship CMake packages (nvtx3, rmm ...) that CMake would find
 # instead of fetching them, so they would not be installed with our package. They are ignored.
 gpu_tuned_warn_pip_cmake_packages
@@ -292,7 +294,10 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   "-DCMAKE_PREFIX_PATH=${RAFT_RELEASE_DIR}" \
   "-Drapids-cmake-sha=${RAPIDS_CMAKE_PIN_SHA}" \
   "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=${SO_NAMES_CMAKE}" \
-  "-DTUNED_SO_TARGETS=kvikio;cuvs_c" \
+  "-DTUNED_SO_TARGETS=kvikio" \
+  "-DTUNED_SO_MARK=-${CUDA_TAG}" \
+  "-DTUNED_SO_DEVICE_TARGETS=cuvs_c" \
+  "-DTUNED_SO_DEVICE_MARK=-${GPU_TUNED_VARIANT}-${CUDA_TAG}" \
   "-DCMAKE_IGNORE_PREFIX_PATH=$(gpu_tuned_cmake_ignore_pip_prefixes)" \
   -Unvtx3_DIR \
   "-DPython_EXECUTABLE=${CUTILE_PYTHON}" \
@@ -406,8 +411,8 @@ else
 fi
 
 # The renamed libraries must have reached the install tree (the build-time rename took effect).
-[[ -f "${INSTALL_PREFIX}/lib/libcuvs_c-tuned.so" ]] || { echo "ERROR: install produced no libcuvs_c-tuned.so under ${INSTALL_PREFIX}/lib (the build-time rename did not take effect)" >&2; exit 1; }
-[[ -f "${LIBCUVS_BUILD_DIR}/_deps/kvikio-build/libkvikio-tuned.so" ]] || { echo "ERROR: no libkvikio-tuned.so in ${LIBCUVS_BUILD_DIR}/_deps/kvikio-build (the build-time rename did not take effect)" >&2; exit 1; }
+[[ -f "${INSTALL_PREFIX}/lib/libcuvs_c-${GPU_TUNED_VARIANT}-${CUDA_TAG}.so" ]] || { echo "ERROR: install produced no libcuvs_c-${GPU_TUNED_VARIANT}-${CUDA_TAG}.so under ${INSTALL_PREFIX}/lib (the build-time rename did not take effect)" >&2; exit 1; }
+[[ -f "${LIBCUVS_BUILD_DIR}/_deps/kvikio-build/libkvikio-${CUDA_TAG}.so" ]] || { echo "ERROR: no libkvikio-${CUDA_TAG}.so in ${LIBCUVS_BUILD_DIR}/_deps/kvikio-build (the build-time rename did not take effect)" >&2; exit 1; }
 
 # Verify output
 LIBDIR="${LIBCUVS_BUILD_DIR}"

@@ -141,29 +141,23 @@ if [[ -z "${CUVS_CMAKE_CONFIG}" ]]; then
 fi
 echo "  cmake config : ${CUVS_CMAKE_CONFIG}"
 
-# Unique shared-object identities, applied to a copy so the build tree's install prefix keeps the
-# names the rest of the build expects. Every shared object this package ships -- cuvs's, and the
-# raft chain and kvikio it vendors -- carries a stock RAPIDS file name and SONAME (librmm.so,
-# librapids_logger.so, libkvikio.so, libcuvs_c.so) and so could be swapped with a stock install in
-# either direction. They become <name>-tuned.so (file name, SONAME, every DT_NEEDED naming them) and
-# the installed CMake import files are repointed. lib${CUVS_LIB_NAME}.so and libraft-${GPU_TUNED_VARIANT}-${CUDA_TAG}.so
-# already carry variant and CUDA tag and are kept; .a archives have no SONAME. Idempotent, so it
-# does not matter whether the vendored raft release was already renamed. See "unique shared-object
-# identities" in tuned-common's tuned-common.sh.
+# Unique shared-object identities (docs/ARCHITECTURE.md F1), applied to a copy so the build tree's install prefix keeps
+# the names the rest of the build expects. Every shared object this package ships -- cuvs's, and the raft chain and
+# kvikio it vendors -- must carry a name no stock RAPIDS install has: librmm-<toolkit>.so, librapids_logger-<toolkit>.so,
+# libkvikio-<toolkit>.so (no device code), libcuvs_c-<variant>-<toolkit>.so (a wrapper bound to the device-code
+# lib${CUVS_LIB_NAME}.so, so the variant is transitive) and the device-code libraries lib${CUVS_LIB_NAME}.so and
+# libraft-${GPU_TUNED_VARIANT}-${CUDA_TAG}.so. The manifest records the mark each takes, chosen from the library's contents;
+# the rename is a no-op for names the build already gave, and renames a stock-named file (an older raft release) and
+# repoints the installed CMake import files. .a archives have no SONAME. Idempotent. See "shared-object names" in
+# tuned-common.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "${STAGE}"' EXIT
 cp -a "${INSTALL_PREFIX}/." "${STAGE}/"
 echo ""
 echo "Giving the shared objects unique identities:"
 OURS_MANIFEST="$(mktemp)"
-for so in librmm.so librapids_logger.so libkvikio.so libcuvs_c.so; do
-    if [[ -f "${STAGE}/lib/${so}" ]]; then
-        echo "${so}" >> "${OURS_MANIFEST}"
-    elif [[ ! -f "${STAGE}/lib/$(gpu_tuned_tuned_so_name "${so}")" ]]; then
-        echo "ERROR: ${so} is missing from ${STAGE}/lib; the rename list is stale." >&2
-        exit 1
-    fi
-done
+gpu_tuned_axes_manifest "${STAGE}/lib" "${GPU_TUNED_VARIANT}" "${CUDA_TAG}" "${OURS_MANIFEST}" \
+    librmm.so librapids_logger.so libkvikio.so libcuvs_c.so || exit 1
 KEEP_RE="^lib(${CUVS_LIB_NAME}|raft-${GPU_TUNED_VARIANT}-${CUDA_TAG})\\.so\$"
 # Renames, repoints the installed CMake and pkg-config files, then fails closed: every shared object
 # is renamed or kept, every DT_NEEDED resolves in the tree or is a toolkit/system library.
@@ -171,6 +165,8 @@ gpu_tuned_rename_package "${STAGE}/lib" "${OURS_MANIFEST}" - "${KEEP_RE}" \
     '^(linux-vdso\.so|ld-linux|libc\.so|libm\.so|libdl\.so|libpthread\.so|librt\.so|libgcc_s\.so|libstdc\+\+\.so|libgomp\.so|libcuda\.so|libcudart\.so|libcublas\.so|libcublasLt\.so|libcusolver\.so|libcusparse\.so|libcurand\.so|libcufft\.so|libnvrtc\.so|libnvJitLink\.so|libnvtx|libcufile\.so)' \
     "${STAGE}/lib/cmake" "${STAGE}/lib/pkgconfig" || exit 1
 rm -f "${OURS_MANIFEST}"
+# F1: each shared object (the kept device-code libraries included) carries the mark its contents require
+gpu_tuned_verify_so_axes "${STAGE}/lib" "${GPU_TUNED_VARIANT}" "${CUDA_TAG}" - || exit 1
 # patchelf rewrote the files; the build-info stamp on the cuvs lib must have survived
 gpu_tuned_verify_build_info_json "${STAGE}/lib/lib${CUVS_LIB_NAME}.so" "release=${RELEASE_TAG}" "variant=${GPU_TUNED_VARIANT}" "cuda.tag=${CUDA_TAG}" || exit 1
 

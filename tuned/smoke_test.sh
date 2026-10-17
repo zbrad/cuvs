@@ -9,8 +9,8 @@
 #      rapids_logger resolve inside it);
 #   3. three real gtest binaries from the build tree (UTIL_TEST, NEIGHBORS_ANN_BRUTE_FORCE_TEST,
 #      PREPROCESSING_TEST) run and pass with the extracted tree's lib/ first on LD_LIBRARY_PATH, and the
-#      libraries they need (libcuvs-<variant>-<cuda>.so, libkvikio-tuned.so, librmm-tuned.so,
-#      librapids_logger-tuned.so) resolve to files inside the extracted tree, not the build tree or a
+#      libraries they need (libcuvs-<variant>-<cuda>.so, libkvikio-<cuda>.so, librmm-<cuda>.so,
+#      librapids_logger-<cuda>.so) resolve to files inside the extracted tree, not the build tree or a
 #      stock install.
 # A smoke test, not the suite: tuned/full_test.sh already ran every binary against the build tree. What is
 # new here is that the bits in the tarball are the ones running. Writes SMOKE_RESULTS_<variant>.log beside
@@ -64,8 +64,8 @@ run() {
     for t in UTIL_TEST NEIGHBORS_ANN_BRUTE_FORCE_TEST PREPROCESSING_TEST; do
         bin="${BUILD_DIR}/gtests/${t}"
         if [[ ! -x "${bin}" ]]; then fail "${t}: ${bin} not found (build with GPU_TUNED_BUILD_TESTS=ON, then tuned/full_test.sh)"; continue; fi
-        gpu_tuned_verify_resolves_in "${EXT}" "${bin}" "^libcuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}\\.so" '^libkvikio-tuned\.so' '^librmm-tuned\.so' '^librapids_logger-tuned\.so' 2>&1 \
-            && ok "${t}: libcuvs, libkvikio-tuned, librmm-tuned, librapids_logger-tuned resolve inside the package" \
+        gpu_tuned_verify_resolves_in "${EXT}" "${bin}" "^libcuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}\\.so" "^libkvikio-${CUDA_TAG}\\.so" "^librmm-${CUDA_TAG}\\.so" "^librapids_logger-${CUDA_TAG}\\.so" 2>&1 \
+            && ok "${t}: libcuvs, libkvikio, librmm, librapids_logger resolve inside the package" \
             || fail "${t}: libraries do not resolve inside the package"
         out="$(LD_LIBRARY_PATH="${EXT}/lib:${TOOLKIT_LIB_DIR}" "${bin}" 2>&1)"; rc=$?
         if [[ ${rc} -eq 0 ]] && grep -q "^\[  PASSED  \]" <<< "${out}"; then
