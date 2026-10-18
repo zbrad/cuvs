@@ -299,7 +299,7 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
   "-DTUNED_SO_DEVICE_TARGETS=cuvs_c" \
   "-DTUNED_SO_DEVICE_MARK=-${GPU_TUNED_VARIANT}-${CUDA_TAG}" \
   "-DCMAKE_IGNORE_PREFIX_PATH=$(gpu_tuned_cmake_ignore_pip_prefixes)" \
-  -Unvtx3_DIR \
+  -Unvtx3_DIR -Uraft_DIR -Urmm_DIR -Urapids_logger_DIR \
   "-DPython_EXECUTABLE=${CUTILE_PYTHON}" \
   "${CMAKE_LAUNCHER_ARGS[@]}" \
   "${NCCL_CMAKE_ARGS[@]}"
@@ -308,6 +308,15 @@ cmake -S "${REPODIR}/cpp" -B "${LIBCUVS_BUILD_DIR}" \
 # missing from the package (nvtx3 comes from the raft release this build links; see
 # gpu_tuned_verify_no_pip_cmake_deps).
 gpu_tuned_verify_no_pip_cmake_deps "${LIBCUVS_BUILD_DIR}/CMakeCache.txt" || exit 1
+
+# The raft chain must be the one extracted for THIS build (RAFT_RELEASE_DIR, named after its tag). A cache from an
+# earlier configure keeps raft_DIR/rmm_DIR/rapids_logger_DIR/nvtx3_DIR pointing at the previous raft release and
+# CMake would silently keep using it (the -U flags above clear them; this proves it).
+for _dep in raft rmm rapids_logger nvtx3; do
+    _dir="$(sed -n "s/^${_dep}_DIR:[A-Z]*=//p" "${LIBCUVS_BUILD_DIR}/CMakeCache.txt" | head -1)"
+    [[ "${_dir}" == "${RAFT_RELEASE_DIR}"/* ]] || { echo "ERROR: ${_dep}_DIR is '${_dir}', not inside this build's raft release ${RAFT_RELEASE_DIR}; the cache is paired with another raft." >&2; exit 1; }
+done
+unset _dep _dir
 
 # Surface which raft this configure actually resolved. As of
 # resolve_raft_release above, this is now zbrad/raft's own published tuned
