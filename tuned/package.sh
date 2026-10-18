@@ -125,10 +125,16 @@ unset _pkg _ver_file _ver
 export GPU_TUNED_BUILD_INFO_DEPS="${BUNDLED_DEPS}"
 echo "  bundled deps : ${BUNDLED_DEPS:-none}"
 
-_raft_dirs=("${GPU_TUNED_BUILD_ROOT}"/raft/*/)
+# The raft release this build linked is the one its CMake cache resolved (tuned/build.sh gates that it is inside the
+# release extracted for this build): <build-root>/raft/<tag>/lib/cmake/raft. Several releases can be extracted side by
+# side, so the cache, not a directory listing, says which one this is.
+_raft_dir="$(sed -n 's/^raft_DIR:[A-Z]*=//p' "${LIBCUVS_BUILD_DIR}/CMakeCache.txt" | head -1)"
 RAFT_DEP=()
-[[ ${#_raft_dirs[@]} -eq 1 && -d "${_raft_dirs[0]}" ]] && RAFT_DEP=("deps.raft.release=$(basename "${_raft_dirs[0]}")")
-unset _raft_dirs
+if [[ "${_raft_dir}" == "${GPU_TUNED_BUILD_ROOT}/raft/"* ]]; then
+    _raft_tag="${_raft_dir#"${GPU_TUNED_BUILD_ROOT}"/raft/}"; _raft_tag="${_raft_tag%%/*}"
+    RAFT_DEP=("deps.raft.release=${_raft_tag}")
+fi
+unset _raft_dir _raft_tag
 # Stamp the staged library with the JSON build info (release first) and confirm it landed before archiving.
 gpu_tuned_stamp_lib_json "${INSTALLED_LIB}" cuvs "${RELEASE_TAG}" "" "deps.bundled=${BUNDLED_DEPS}" ${RAFT_DEP[@]+"${RAFT_DEP[@]}"} || exit 1
 
