@@ -4,8 +4,8 @@
 #
 # tuned/package.sh <variant> — package an already-built (tuned/build.sh
 # <variant>) cmake-install tree into a tarball (with unique shared-object
-# identities; see below). Publishing is a separate step, tuned/release.sh,
-# so the tarball can be used locally first. Downstream C++ consumers (zbrad/faiss) can pull a
+# identities; see below). Releasing is a separate step, tuned/release.sh (gates only), then
+# tuned/publish.sh, so the tarball can be used locally first. Downstream C++ consumers (zbrad/faiss) can pull a
 # published cuVS build instead of reaching into a local sibling checkout.
 #
 # Not a Python wheel (unlike raft/flashinfer/pytorch's tuned/wheel.sh) --
@@ -19,7 +19,7 @@
 #
 # Usage:
 #   bash tuned/build.sh rtx50      # first, produces the install tree
-#   bash tuned/package.sh rtx50    # then, packages it; tuned/release.sh publishes
+#   bash tuned/package.sh rtx50    # then, packages it; tuned/release.sh gates it, tuned/publish.sh publishes
 set -euo pipefail
 
 REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -243,4 +243,4 @@ fi
 
 echo ""
 echo "Packaged (not published): ${TARBALL} (${RELEASE_TAG})"
-echo "Next: bash tuned/smoke_test.sh ${GPU_TUNED_VARIANT}, then bash tuned/release.sh ${GPU_TUNED_VARIANT}"
+echo "Next: bash tuned/smoke_test.sh ${GPU_TUNED_VARIANT}, then bash tuned/release.sh ${GPU_TUNED_VARIANT} (gates), then bash tuned/publish.sh ${GPU_TUNED_VARIANT}"

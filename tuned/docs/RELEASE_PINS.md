@@ -7,8 +7,9 @@ release it was built against (`resolve_raft_release()` in `tuned/build.sh`
 downloads a specific raft release tag — see that repo's own
 `tuned/docs/RELEASE_PINS.md` for what's *in* the raft side of a pairing).
 Update this table as part of publishing a release — add a row before or
-right after running `tuned/release.sh` (`tuned/package.sh` only packages;
-`tuned/release.sh` publishes, ARCHITECTURE B3).
+right after running `tuned/publish.sh` (`tuned/package.sh` only packages;
+`tuned/release.sh` runs the gates and writes a ready-marker, and only
+`tuned/publish.sh` publishes, ARCHITECTURE B3, I3, I5).
 
 Why this exists: `rapids-cmake` is fetched unpinned by default
 (`RAPIDS.cmake` falls through to `RAPIDS_BRANCH`, which upstream sets to

@@ -8,7 +8,7 @@
 # Writes a timestamped results log to tuned/releases/, which
 # package.sh requires (it names the tested commit) and release.sh requires
 # (fresher than the built .so, containing the success marker) before it
-# will publish; release.sh attaches it as a release asset. Mirrors
+# writes the ready-marker; publish.sh attaches it as a release asset. Mirrors
 # zbrad/raft's tuned/full_test.sh + tuned/raft_test_common.sh.
 set -euo pipefail
 
