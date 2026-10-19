@@ -7,8 +7,8 @@ separate single-arch builds by generation:
 - **RTX 50** (Blackwell, SM 120) — RTX 5080, RTX 5090 — `tuned/build.sh rtx50`
 
 Each is single-arch, named by GPU codename per
-[WHEEL_NAMING.md](WHEEL_NAMING.md): `libcuvs-rtx40-cu132.so` /
-`libcuvs-rtx50-cu132.so`. Datacenter/professional architectures (Hopper,
+[WHEEL_NAMING.md](WHEEL_NAMING.md): `libcuvs-rtx40-cu134.so` /
+`libcuvs-rtx50-cu134.so`. Datacenter/professional architectures (Hopper,
 Blackwell DC, GB200, Ada professional parts) are intentionally not built —
 see WHEEL_NAMING.md's guiding principles for why.
 
@@ -18,25 +18,26 @@ See [BUILD_gb10.md](BUILD_gb10.md) for the aarch64 / DGX Spark build.
 
 ## Prerequisites
 
-- CUDA 13.2 toolkit for **x86_64** (`/usr/local/cuda-13.2`, or set `CUDA_HOME`)
+- CUDA 13.4 (or 13.3) toolkit for **x86_64** (`/usr/local/cuda-13.4`, or set `CUDA_HOME`)
 - Build tools: CMake (>=3.30), Ninja, a C++20 compiler
 - 2 GB+ free disk space (single-arch builds, no fat binary)
 
 ## Quick start
 
 ```bash
-bash tuned/build.sh rtx40
-# produces: cpp/build/libcuvs-rtx40-cu132.so
+CUDA_VER=13.4 bash tuned/build.sh rtx40
+# produces: tuned/build/cu134/cmake/libcuvs-rtx40-cu134.so
 
-bash tuned/build.sh rtx50
-# produces: cpp/build/libcuvs-rtx50-cu132.so
+CUDA_VER=13.4 bash tuned/build.sh rtx50
+# produces: tuned/build/cu134/cmake/libcuvs-rtx50-cu134.so
 ```
 
-To target a different CUDA version:
+The toolkit has no default: name it with `CUDA_VER` or `CUDA_TAG`. To target
+a different CUDA version:
 
 ```bash
 CUDA_VER=13.3 bash tuned/build.sh rtx40
-# produces: cpp/build/libcuvs-rtx40-cu133.so
+# produces: tuned/build/cu133/cmake/libcuvs-rtx40-cu133.so
 ```
 
 ## CUDA version selection
@@ -64,8 +65,13 @@ full version/naming scheme.
 
 | Artifact | Location | Notes |
 |----------|----------|-------|
-| `libcuvs-rtx40-cu132.so` | `cpp/build/` | Single-arch, SM 89 |
-| `libcuvs-rtx50-cu132.so` | `cpp/build/` | Single-arch, SM 120a (Blackwell family-specific) |
+| `libcuvs-rtx40-cu134.so` | `tuned/build/cu134/cmake/` | Single-arch, SM 89 |
+| `libcuvs-rtx50-cu134.so` | `tuned/build/cu134/cmake/` | Single-arch, SM 120a (Blackwell family-specific) |
+
+Each toolkit has one tree, `tuned/build/<cuda_tag>/`: `cmake/` (the build),
+`dist/` (package tarballs), `releases/` (test and smoke logs), `ccache/`. It
+belongs to one variant (`.variant` claim): build the other variant in its own
+checkout.
 
 ## Troubleshooting
 

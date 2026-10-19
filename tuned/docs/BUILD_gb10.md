@@ -5,7 +5,7 @@ Grace Blackwell Superchip, compute capability **SM 121** (confirmed via
 `torch` `device_capability` on real hardware).
 
 The GB10 build is a single-arch (aarch64, SM 121) build named by GPU codename
-per [WHEEL_NAMING.md](WHEEL_NAMING.md): `libcuvs-gb10-cu132.so`.
+per [WHEEL_NAMING.md](WHEEL_NAMING.md): `libcuvs-gb10-cu134.so`.
 
 See [BUILD_rtx.md](BUILD_rtx.md) for the RTX 40 / RTX 50 (x86_64) builds.
 
@@ -13,8 +13,8 @@ See [BUILD_rtx.md](BUILD_rtx.md) for the RTX 40 / RTX 50 (x86_64) builds.
 
 ## Prerequisites
 
-- CUDA 13.2 toolkit for **aarch64 / sbsa-linux** (`/usr/local/cuda-13.2`, or
-  set `CUDA_HOME`)
+- CUDA 13.4 (or 13.3) toolkit for **aarch64 / sbsa-linux** (`/usr/local/cuda-13.4`,
+  or set `CUDA_HOME`)
 - Python 3 with development headers (for optional Python bindings)
 - Build tools: CMake (>=3.30), Ninja, a C++20 compiler
 - 8 GB+ free disk space
@@ -22,15 +22,17 @@ See [BUILD_rtx.md](BUILD_rtx.md) for the RTX 40 / RTX 50 (x86_64) builds.
 ## Quick start
 
 ```bash
-bash tuned/build.sh gb10
-# produces: cpp/build/libcuvs-gb10-cu132.so
+CUDA_VER=13.4 bash tuned/build.sh gb10
+# produces: tuned/build/cu134/cmake/libcuvs-gb10-cu134.so
 ```
+
+The toolkit has no default: name it with `CUDA_VER` or `CUDA_TAG`.
 
 To target a different CUDA version:
 
 ```bash
 CUDA_VER=13.3 bash tuned/build.sh gb10
-# produces: cpp/build/libcuvs-gb10-cu133.so
+# produces: tuned/build/cu133/cmake/libcuvs-gb10-cu133.so
 ```
 
 ## CUDA version selection
@@ -51,9 +53,12 @@ On a host with multiple toolkits, `CUDA_HOME` auto-resolves to
 
 | Artifact | Location | Notes |
 |----------|----------|-------|
-| `libcuvs-gb10-cu132.so` | `cpp/build/` | Single-arch, SM 121 (GB10 Grace Blackwell) |
+| `libcuvs-gb10-cu134.so` | `tuned/build/cu134/cmake/` | Single-arch, SM 121 (GB10 Grace Blackwell) |
 
-The `cu132` portion tracks `CUDA_TAG`; `CUDA_ARCHS` is fixed at `121a-real`
+Each toolkit has one tree, `tuned/build/<cuda_tag>/`: `cmake/` (the build),
+`dist/` (package tarballs), `releases/` (test and smoke logs), `ccache/`.
+
+The `cu134` portion tracks `CUDA_TAG`; `CUDA_ARCHS` is fixed at `121a-real`
 since GB10 is the only chip this build targets. The `a` suffix targets the
 Blackwell family-specific SASS variant.
 

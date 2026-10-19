@@ -38,7 +38,7 @@ mapping.
 - CUDA version (`cu132`) is derived from the single knob in `tuned/env.sh`.
 - Every build here is single-arch, compiled `-real` (native SASS, no PTX/JIT
   fallback).
-- The build directory (`cpp/build/`) is version-agnostic; no CUDA version in the path.
+- The build directory is `tuned/build/<cuda_tag>/cmake/` (one per toolkit, no variant level; the CUDA tag is in the path). The everyday `cpp/build/` is never used.
 
 ### Consumer GPU Support
 
@@ -113,7 +113,7 @@ Built with:
 bash tuned/build.sh gb10
   # CUDA_VER=13.2, CUDA_ARCHS="121a-real" (single-arch, Blackwell family-specific)
   # -DCUVS_OUTPUT_NAME=cuvs-gb10-cu132
-  # Output: cpp/build/libcuvs-gb10-cu132.so
+  # Output: tuned/build/cu132/cmake/libcuvs-gb10-cu132.so
 ```
 
 Key DGX Spark characteristics:
