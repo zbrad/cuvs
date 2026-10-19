@@ -33,7 +33,7 @@ tar xzf libcuvs-*-gb10-${CUDA_TAG}.tar.gz                 # extracts into the cu
 
 ## This release
 
-Rebuilt in the flat per-toolkit tree (`tuned/build/cu134/`) against raft `v0.20261019.0-gb10-cu134` with axis-named shared objects.
+Rebuilt in the flat per-toolkit tree (`tuned/build/cu134/`) against the raft build at `3756ce9e` with axis-named shared objects. That raft build is published as `v0.20261019.0-gb10-cu134`; the build-info stamp inside `libcuvs-gb10-cu134.so` names it `v0.20261018.0-gb10-cu134`, the label the raft package carried before it was relabelled and published. The 20261018 name was never published; it is the same raft build.
 Shipped libraries: `libcuvs-gb10-cu134.so`, `libcuvs_c-gb10-cu134.so`, `libraft-gb10-cu134.so` (device code: variant and toolkit);
 `libkvikio-cu134.so`, `librmm-cu134.so`, `librapids_logger-cu134.so` (toolkit only). **Breaking rename:** the earlier `libcuvs_c-tuned.so`,
 `libkvikio-tuned.so`, `librmm-tuned.so` and `librapids_logger-tuned.so` no longer exist; rebuild consumers (zbrad/faiss does).
