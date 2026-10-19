@@ -23,7 +23,7 @@
 set -euo pipefail
 
 REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GPU_TUNED_ARG_VARIANT="$1"
+GPU_TUNED_ARG_VARIANT="${1:?usage: bash tuned/package.sh <variant>}"
 
 # shellcheck source=env.sh
 source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
@@ -214,6 +214,32 @@ cuda_tag=${CUDA_TAG}
 variant=${GPU_TUNED_VARIANT}
 sha256=$(sha256sum "${TARBALL}" | awk '{print $1}')
 INFO
+
+# Release notes draft (ARCHITECTURE H5): release.sh needs a tracked, reviewed notes file. If it does not exist yet,
+# write an untracked DRAFT stub that release.sh refuses until its banner line is deleted. Never overwrites a file.
+NOTES_FILE="${REPODIR}/tuned/releases/RELEASE_NOTES_${RELEASE_TAG#v}.md"
+RAFT_RELEASE="${RAFT_DEP[0]-}"
+RAFT_RELEASE="${RAFT_RELEASE#deps.raft.release=}"
+TESTED_SUMMARY="$(sed -n 's/^=== \(Full test suite summary:.*\) ===$/\1/p' "${TEST_LOG}" | tail -1)"
+if [[ -e "${NOTES_FILE}" ]]; then
+    echo "Release notes ${NOTES_FILE##*/} already exist; not overwritten."
+else
+    cat > "${NOTES_FILE}" <<NOTES
+<!-- DRAFT — not yet published: review, then delete this line and commit -->
+# cuVS ${CUVS_VERSION} — ${GPU_TUNED_HW_LABEL} (${CUDA_VER}) — ${RELEASE_TAG}
+
+**Package**: \`$(basename "${TARBALL}")\` · built at \`${SHORT_SHA}\` · raft release \`${RAFT_RELEASE:-not recorded}\`
+
+## This release
+
+_Author: describe what changed in this release, then delete this line._
+
+## Tested
+
+- ${TESTED_SUMMARY:-Full test suite summary: not recorded in ${TEST_LOG##*/}} (log: tested at \`${TESTED_COMMIT}\`).
+NOTES
+    echo "Draft release notes written: ${NOTES_FILE} (delete its DRAFT line once reviewed, then commit)"
+fi
 
 echo ""
 echo "Packaged (not published): ${TARBALL} (${RELEASE_TAG})"

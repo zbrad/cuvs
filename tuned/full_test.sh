@@ -1,18 +1,18 @@
 #!/bin/bash
 # tuned/full_test.sh <variant> — run every built gtest binary
-# (cpp/build/<cuda_tag>/<variant>/gtests/*) for a GPU_TUNED_BUILD_TESTS=1 build. cuvs's tuned
+# (tuned/build/<cuda_tag>/cmake/gtests/*) for a GPU_TUNED_BUILD_TESTS=1 build. cuvs's tuned
 # build normally skips tests entirely (-DBUILD_TESTS=OFF, see build.sh) --
 # this is the opt-in path: rebuild with GPU_TUNED_BUILD_TESTS=1 first,
 # then run this before publishing.
 #
 # Writes a timestamped results log to tuned/releases/, which
-# package.sh's publish step requires (fresher than the built .so,
-# containing the success marker) before it will publish, and attaches as
-# a release asset -- see package.sh's own comment for why. Mirrors
+# package.sh requires (it names the tested commit) and release.sh requires
+# (fresher than the built .so, containing the success marker) before it
+# will publish; release.sh attaches it as a release asset. Mirrors
 # zbrad/raft's tuned/full_test.sh + tuned/raft_test_common.sh.
 set -euo pipefail
 
-GPU_TUNED_ARG_VARIANT="$1"
+GPU_TUNED_ARG_VARIANT="${1:?usage: bash tuned/full_test.sh <variant>}"
 REPODIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=env.sh
 source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
