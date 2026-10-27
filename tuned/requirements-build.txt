@@ -12,3 +12,6 @@ nvidia-nccl-cu13
 
 # The build generator CMake uses.
 ninja
+
+# CMake >=4.0 (cuVS requires it; the host has 3.30), so the build venv supplies it.
+cmake>=4.0
