@@ -119,6 +119,16 @@ GPU_TUNED_ARG_VARIANT="$1"
 # shellcheck source=env.sh
 source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
 
+# The toolkit's Python build venv (C9, tuned-common): created or reused (verified), activated, current setuptools.
+# From here python3, pip and ninja are the venv's, so cmake's cuda.tile import and the NCCL wheel below no longer
+# depend on the system interpreter or on another project's venv being on PATH.
+gpu_tuned_setup_build_venv "${GPU_TUNED_VENV_DIR}" "${REPODIR}" || exit 1
+pip install -r "${REPODIR}/tuned/requirements-build.txt"
+# The current setuptools, installed last so nothing above can hold it back (C8, tuned-common).
+gpu_tuned_install_setuptools || exit 1
+echo "Build venv packages (pin tuned/requirements-build.txt from this list):"
+pip freeze | sed 's/^/  /'
+
 CUDA_ARCHS="${GPU_TUNED_CUDA_ARCH}-real"
 CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"  # e.g. cuvs-rtx50-cu132
 
@@ -246,7 +256,7 @@ if [[ "${CUVS_BUILD_MG_ALGOS}" == "ON" ]]; then
     NCCL_PY_PREFIX="$(python3 -c 'import nvidia.nccl as m; print(list(m.__path__)[0])' 2>/dev/null)" || true
     if [[ -z "${NCCL_PY_PREFIX}" ]]; then
         echo "ERROR: BUILD_MG_ALGOS=ON requires NCCL, but 'python3 -c import nvidia.nccl'" >&2
-        echo "  failed. Install it: pip install nvidia-nccl-cu13" >&2
+        echo "  failed in the build venv ${VIRTUAL_ENV:-?}; nvidia-nccl-cu13 is in tuned/requirements-build.txt." >&2
         exit 1
     fi
     NCCL_LIB="$(ls "${NCCL_PY_PREFIX}"/lib/libnccl.so* 2>/dev/null | head -1)"

@@ -141,3 +141,7 @@ GPU_TUNED_BUILD_ROOT="${GPU_TUNED_REPO_ROOT}/tuned/build/${CUDA_TAG}"
 export CCACHE_DIR="${GPU_TUNED_BUILD_ROOT}/ccache"
 export CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-40G}"
 export GPU_TUNED_BUILD_ROOT
+# The Python build venv (cuda.tile for cmake's cuTile step, the NCCL wheel, ninja), one per toolkit like the rest of the
+# tree; gpu_tuned_setup_build_venv in build.sh creates it. Requirements: tuned/requirements-build.txt.
+GPU_TUNED_VENV_DIR="${GPU_TUNED_BUILD_ROOT}/venv"
+export GPU_TUNED_VENV_DIR

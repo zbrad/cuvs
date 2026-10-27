@@ -1,0 +1,14 @@
+# Python packages the cuVS build needs, installed into the toolkit's build venv (tuned/build/<cuda-tag>/venv) by
+# tuned/build.sh. Before this file they came from whatever system python3 and PATH happened to hold (ninja was
+# found in another project's venv). Unpinned on purpose until the first build records what resolves: build.sh
+# prints `pip freeze` for the venv, so pin from that log.
+
+# cuTile Python: cmake's generate_cutile_kernels.cmake imports cuda.tile (cuvs_find_build_python()).
+cuda-tile[tileiras]
+
+# NCCL for BUILD_MG_ALGOS=ON (rtx40/rtx50). The wheel ships only libnccl.so.2, so build.sh points
+# NCCL_LIBRARY/NCCL_INCLUDE_DIR at its exact paths.
+nvidia-nccl-cu13
+
+# The build generator CMake uses.
+ninja
