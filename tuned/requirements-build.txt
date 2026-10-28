@@ -1,7 +1,7 @@
 # Python packages the cuVS build needs, installed into the toolkit's build venv (tuned/build/<cuda-tag>/venv) by
 # tuned/build.sh. Before this file they came from whatever system python3 and PATH happened to hold (ninja was
-# found in another project's venv). Unpinned on purpose until the first build records what resolves: build.sh
-# prints `pip freeze` for the venv, so pin from that log.
+# found in another project's venv). The versions are locked in requirements-build.lock (gpu_tuned_freeze_requirements) and
+# installed under it; to change them build with GPU_TUNED_UNLOCKED=1 and freeze again.
 
 # cuTile Python: cmake's generate_cutile_kernels.cmake imports cuda.tile (cuvs_find_build_python()).
 cuda-tile[tileiras]

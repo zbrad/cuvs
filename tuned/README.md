@@ -27,7 +27,7 @@ CUDA_TAG=cu134 bash tuned/publish.sh gb10      # publishes exactly what release.
 | `repo.env` | cuVS-only settings |
 | `common.sh`, `sync-common.sh`, `common-data/` | vendored from tuned-common; refresh with `bash tuned/sync-common.sh sync` |
 | `build.sh`, `full_test.sh`, `package.sh`, `smoke_test.sh`, `release.sh`, `publish.sh` | the stages above |
-| `requirements-build.txt` | the build venv's Python requirements: `cuda-tile[tileiras]`, `nvidia-nccl-cu13`, `ninja`, `cmake>=4.0` (unpinned until a build's `pip freeze` is used to pin them) |
+| `requirements-build.txt` | the build venv's Python requirements: `cuda-tile[tileiras]`, `nvidia-nccl-cu13`, `ninja`, `cmake>=4.0` (locked in `requirements-build.lock`, installed under it by `gpu_tuned_pip_install_requirements`) |
 | `verify_bundled_deps.sh` | fails if a shared library in an install tree or tarball needs a library that is neither shipped nor a system library, or has a `RUNPATH` into a build tree |
 | `_raft_release/` | gitignored; extracted RAFT releases per variant and toolkit (`gb10-cu133`, `gb10-cu134`) |
 | `docs/` | `BUILD_gb10.md`, `BUILD_rtx.md`, `WHEEL_NAMING.md`, `BINARY_BUILD_INFO.md`, `FORK_PATCHES.md`, `RELEASE_PINS.md` |

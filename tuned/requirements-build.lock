@@ -1,0 +1,15 @@
+# Locked by gpu_tuned_freeze_requirements from the build venv that passed, for requirements-build.txt.
+# Python 3.14.6, aarch64.
+# Regenerate: build once with GPU_TUNED_UNLOCKED=1, run gpu_tuned_freeze_requirements, review the diff.
+cmake==4.4.4
+cuda-tile==1.7.0
+cuda-toolkit==13.4.3
+ninja==1.13.2
+nvidia-cuda-crt==13.4.92
+nvidia-cuda-nvcc==13.4.92
+nvidia-cuda-runtime==13.4.92
+nvidia-cuda-tileiras==13.4.92
+nvidia-nccl-cu13==2.32.3
+nvidia-nvjitlink==13.4.92
+nvidia-nvvm==13.4.92
+typing_extensions==4.16.0

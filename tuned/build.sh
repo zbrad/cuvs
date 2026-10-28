@@ -123,10 +123,10 @@ source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
 # From here python3, pip and ninja are the venv's, so cmake's cuda.tile import and the NCCL wheel below no longer
 # depend on the system interpreter or on another project's venv being on PATH.
 gpu_tuned_setup_build_venv "${GPU_TUNED_VENV_DIR}" "${REPODIR}" || exit 1
-pip install -r "${REPODIR}/tuned/requirements-build.txt"
+gpu_tuned_pip_install_requirements "${REPODIR}/tuned/requirements-build.txt" || exit 1
 # The current setuptools, installed last so nothing above can hold it back (C8, tuned-common).
 gpu_tuned_install_setuptools || exit 1
-echo "Build venv packages (pin tuned/requirements-build.txt from this list):"
+echo "Build venv packages:"
 pip freeze | sed 's/^/  /'
 
 CUDA_ARCHS="${GPU_TUNED_CUDA_ARCH}-real"
