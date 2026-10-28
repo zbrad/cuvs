@@ -28,6 +28,9 @@ GPU_TUNED_ARG_VARIANT="${1:?usage: bash tuned/package.sh <variant>}"
 # shellcheck source=env.sh
 source "${REPODIR}/tuned/env.sh" "${GPU_TUNED_ARG_VARIANT}" || exit 1
 
+# CMake 4 from the toolkit's build venv: the package's rmm/raft CMake config files need CMake 4.0 and the host has 3.30.
+gpu_tuned_setup_build_venv "${GPU_TUNED_VENV_DIR}" "${REPODIR}" || exit 1
+
 CUVS_LIB_NAME="cuvs-${GPU_TUNED_VARIANT}-${CUDA_TAG}"
 # tr -d '\r': defends against CRLF drift in VERSION (bash's $() only
 # strips a trailing \n, not \r) -- a real, empirically-hit failure mode:
